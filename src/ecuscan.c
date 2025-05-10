@@ -203,7 +203,7 @@ void Tempbar(int tempC)
 void display_data()
 {
     unsigned char data;
-    int rc,tps,rpm,maf,batt,O2Avg,O2Max;
+    int rc,tps,rpm,maf,batt,O2Avg,lambda;
     int kmh,mph,tempC,tempF,speed,temp;
     int currentIdx = -1;
     uint16_t address = 0x0;
@@ -385,7 +385,7 @@ void display_data()
         address = signals[currentIdx].address;
     }
 
-    if ((rc=ssm_query_ecu(0x1185,&data,1)) != 0)
+    if ((rc=ssm_query_ecu(address,&data,1)) != 0)
     {
         printf("ssm_query_ecu() returned %d\n",rc);
         ssm_close();
@@ -441,36 +441,27 @@ void display_data()
 
     refresh();
 
-    /*------------*/
-    /* Read O2Max */
-    /*------------*/
+    /*------------------*/
+    /* Calculate Lambda */
+    /*------------------*/
 
-    currentIdx = find_signal_index("O2Maximum", MAX_LABELCOUNT, &signals);
-    if(currentIdx == -1){
-        address = 0x0;
-    }else{
-        address = signals[currentIdx].address;
-    }
+    // Fake narrowband lambda: 0.88 to 1.12 scaled by 100
+    lambda = 112 - ((O2Avg - 100) * 24) / 800;
 
-    if ((rc=ssm_query_ecu(0x1291,&data,1)) != 0)
-    {
-        printf("ssm_query_ecu() returned %d\n",rc);
-        ssm_close();
-        exit(7);
-    }
-    
-    O2Max=(data*5000)/512;
+    // Clamp
+    if (lambda < 88) lambda = 88;
+    if (lambda > 112) lambda = 112;
 
     move(10,49);
     white_on_black();
-    printw("O2 Sensor (Right)");
+    printw("Lambda");
 
     move(11,47);
-    bar(O2Max/25);
+    bar(lambda/25);
 
     move(11,68);
     white_on_black();
-    printw(" %3d mV ",O2Max); 
+    printw(" %d.%02d - ", lambda/100, lambda%100); 
 
     refresh();
 
@@ -493,7 +484,8 @@ void display_data()
         gettimeofday(&now,NULL);
         if (celsius) temp=tempC; else temp=tempF;
         if (kilometers) speed=kmh; else speed=mph;
-        rc=fprintf(logh,"%d,%d,%d,%d,%d.%02d,%d.%02d,%d,%d,%d\n",(now.tv_sec-start.tv_sec),speed,rpm,tps/5,maf/100,maf%100,batt/100,batt%100,temp,O2Avg,O2Max);
+        rc=fprintf(logh,"%d,%d,%d,%d,%d.%02d,%d.%02d,%d,%d,%d.%02d\n",\
+        (now.tv_sec-start.tv_sec),speed,rpm,tps/5,maf/100,maf%100,batt/100,batt%100,temp,O2Avg,lambda/100,lambda%100);
         if (rc<0) logmode=2;
     }
 
@@ -573,7 +565,7 @@ int main(int argc, char *argv[])
         {   
             logh=fopen(logfile,"a");
             if (logh == NULL) logmode=2;
-            rc=fprintf(logh,"time,speed,rpm,tps,maf,batt,temp,O2Avg,O2Max\n");
+            rc=fprintf(logh,"time,speed,rpm,tps,maf,batt,temp,O2Avg,lambda\n");
             if (rc<0) logmode=2;
         }
         if ((logmode==0) && (logh != NULL))
