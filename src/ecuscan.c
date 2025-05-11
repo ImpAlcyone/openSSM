@@ -37,6 +37,9 @@
 #define MAX_LABELLENGTH 128
 #define MAX_UNITLENGTH 16
 #define MAX_LABELCOUNT 32
+#define MAX_FORMATLENGTH 16
+#define MAX_OUTPUTFORMATLENGTH 512
+#define MAX_OUTPUTLINELENGTH 1024
 
 int celsius=1,kilometers=1,logmode=0,rc;
 FILE *logh=NULL;
@@ -48,17 +51,20 @@ struct timeval start,now;
 /*=================================*/
 
 typedef struct {
+    uint8_t loggingEnabled;
     char label[MAX_LABELLENGTH];
     char unit[MAX_UNITLENGTH];
     uint16_t address;
-} SignalConfig;
+    char format[MAX_FORMATLENGTH];
+    int conversionOffset;
+    int conversionMulFactor;
+    int conversionDivFactor;
+} SignalConfig_t;
 
-SignalConfig signals[MAX_LABELCOUNT];
-
-int load_signal_config(const char *filename, SignalConfig *signals, int max_label_count) {
+int load_signal_config(const char *filename, SignalConfig_t *signals, int max_label_count) {
     FILE *file = fopen(filename, "r");
     if (!file) {
-        perror("Failed to open data map file");
+        perror("Failed to open signal config file");
         return -1;
     }
 
@@ -69,24 +75,52 @@ int load_signal_config(const char *filename, SignalConfig *signals, int max_labe
 
     while ((read = getline(&line, &len, file)) != -1 && count < max_label_count) {
         // Skip header or comments
-        if (line[0] == '#' || strncmp(line, "Label", 5) == 0) continue;
+        if (line[0] == '#') continue;
 
         // Remove newline if present
         line[strcspn(line, "\r\n")] = 0;
 
-        char *label = strtok(line, ",");
+        uint8_t loggingEnabled = atoi(strtok(line, ","));
+        char *label = strtok(NULL, ",");
         char *unit = strtok(NULL, ",");
         char *addr_str = strtok(NULL, ",");
+        char *format = strtok(NULL, ",");
+        char *convOffset = strtok(NULL, ",");
+        char *convMulFac = strtok(NULL, ",");
+        char *convDivFac = strtok(NULL, ",");
 
-        if (label && unit && addr_str) {
-            strncpy(signals[count].label, label, sizeof(signals[count].label) - 1);
-            strncpy(signals[count].unit, unit, sizeof(signals[count].unit) - 1);
-            unsigned int addr;
-            if (sscanf(addr_str, "%x", &addr) == 1) {
-                signals[count].address = (uint16_t)addr;
-            }
-            count++;
+
+        signals[count].loggingEnabled = loggingEnabled;
+
+        if (!label || !unit || !addr_str ){
+            continue;
         }
+            
+        strncpy(signals[count].label, label, sizeof(signals[count].label) - 1);
+        signals[count].label[sizeof(signals[count].label) - 1] = '\0';
+
+        strncpy(signals[count].unit, unit, sizeof(signals[count].unit) - 1);
+        signals[count].unit[sizeof(signals[count].unit) - 1] = '\0';
+
+        unsigned int addr;
+        if (sscanf(addr_str, "%x", &addr) == 1) {
+            signals[count].address = (uint16_t)addr;
+        }
+
+        if (format) {
+            strncpy(signals[count].format, format, sizeof(signals[count].format) - 1);
+            signals[count].format[sizeof(signals[count].format) - 1] = '\0';    
+        } else {
+            strcpy(signals[count].format, "%d");
+        }   
+           
+        signals[count].conversionOffset = convOffset ? atoi(convOffset) : 0;
+            
+        signals[count].conversionMulFactor = convMulFac ? atoi(convMulFac) : 1;
+            
+        signals[count].conversionDivFactor = convDivFac ? atoi(convDivFac) : 1;
+                                                
+        count++;
     }
 
     free(line);
@@ -94,7 +128,7 @@ int load_signal_config(const char *filename, SignalConfig *signals, int max_labe
     return count;
 }
 
-int find_signal_index(const char *label, int signalCount, SignalConfig *signals) {
+int find_signal_index(const char *label, int signalCount, SignalConfig_t *signals) {
     for (int idx = 0; idx < signalCount; idx++) {
         if (strcmp(signals[idx].label, label) == 0) {
             return idx;
@@ -200,14 +234,14 @@ void Tempbar(int tempC)
     for (y=x;y<20;y++) printw(" ");
 }
 
-void display_data()
+void display_data(SignalConfig_t *signals ,int *measbuffer)
 {
     unsigned char data;
-    int rc,tps,rpm,maf,batt,O2Avg,lambda;
+    int rc,tps,rpm,ivd,batt,O2Avg,lambda;
     int kmh,mph,tempC,tempF,speed,temp;
     int currentIdx = -1;
     uint16_t address = 0x0;
-
+   
     /*----------*/
     /* Read KMH */
     /*----------*/
@@ -239,7 +273,7 @@ void display_data()
     move(5,26);
     white_on_black();
     if (kilometers) printw("%3d km/h ",kmh); else printw("%3d mph ",mph);
-
+   
     refresh();
 
     /*----------*/
@@ -271,7 +305,7 @@ void display_data()
     move(8,26);
     white_on_black();
     printw(" %4d rpm",rpm);
-
+   
     refresh();
 
     /*----------*/
@@ -307,11 +341,11 @@ void display_data()
 
     refresh();
 
-    /*----------*/
-    /* Read MAF */
-    /*----------*/
+    /*----------------------*/
+    /* Read Idle Valve Duty */
+    /*----------------------*/
 
-    currentIdx = find_signal_index("airflowSensor", MAX_LABELCOUNT, &signals);
+    currentIdx = find_signal_index("ISUDutyValve", MAX_LABELCOUNT, &signals);
     if(currentIdx == -1){
         address = 0x0;
     }else{
@@ -325,26 +359,26 @@ void display_data()
         exit(7);
     }
     
-    maf=(data*500)/255;
+    ivd=(data*100)/255;
 
     move(13,8);
     white_on_black();
-    printw("Airflow Sensor");
+    printw("Idle Valve Duty");
 
     move(14,5);
-    bar(maf/5);
+    bar(ivd/5);
 
     move(14,26);
     white_on_black();
-    printw(" %1d.%02dV ",maf/100,maf%100);
-
+    printw(" %3d.%02dV ",ivd/100,ivd%100);
+   
     refresh();
 
-    /*-----------*/
-    /* Read Batt */
-    /*-----------*/
+    /*---------------------------*/
+    /* Read Injector Pulse width */
+    /*---------------------------*/
 
-    currentIdx = find_signal_index("batteryVoltage", MAX_LABELCOUNT, &signals);
+    currentIdx = find_signal_index("injectorPulseWidth", MAX_LABELCOUNT, &signals);
     if(currentIdx == -1){
         address = 0x0;
     }else{
@@ -438,7 +472,7 @@ void display_data()
     move(8,68);
     white_on_black();
     printw(" %3d mV ",O2Avg); 
-
+  
     refresh();
 
     /*------------------*/
@@ -465,7 +499,7 @@ void display_data()
 
     refresh();
 
-    /*---------*/
+     /*---------*/
     /* Logmode */
     /*---------*/
 
@@ -479,27 +513,88 @@ void display_data()
     move(19,35);
     printw(" Logging ");
 
+}
+    
+void measure_data(int signalCount, 
+    SignalConfig_t *signals, 
+    int *measbuffer){
+    
+    int rawData = 0;
+    char logLine[MAX_OUTPUTLINELENGTH];
+    char valueStr[32];  // temporary buffer for each value
+    logLine[0] = '\0';  // start with empty string
+    int elapsed = 0;
+
+    //Loop, poll, convert and write into buffer
+    for(int i = 0; i < signalCount; i++){
+        if(signals[i].loggingEnabled){
+           if ((rc=ssm_query_ecu(signals[i].address,&rawData,1)) != 0){   
+                printf("ssm_query_ecu() returned %d\n",rc);
+                ssm_close();
+                exit(7);
+            }
+        
+            measbuffer[i] = ((rawData - signals[i].conversionOffset) * signals[i].conversionMulFactor) / signals[i].conversionDivFactor;
+
+        }
+    }
+   
     if (logmode == 1)
     {
         gettimeofday(&now,NULL);
-        if (celsius) temp=tempC; else temp=tempF;
-        if (kilometers) speed=kmh; else speed=mph;
+        elapsed = now.tv_sec - start.tv_sec;
+
         rc=fprintf(logh,"%d,%d,%d,%d,%d.%02d,%d.%02d,%d,%d,%d.%02d\n",\
-        (now.tv_sec-start.tv_sec),speed,rpm,tps/5,maf/100,maf%100,batt/100,batt%100,temp,O2Avg,lambda/100,lambda%100);
+        (now.tv_sec-start.tv_sec),speed,rpm,tps/5,ivd/100,ivd%100,batt/100,batt%100,temp,O2Avg,lambda/100,lambda%100);
         if (rc<0) logmode=2;
     }
 
 
 }
 
-int main(int argc, char *argv[])
-{
+void build_logfile_header(int signalCount, 
+    const SignalConfig_t *signals, 
+    char logfileHeader[2][MAX_FORMATLENGTH]) {
+
+    logfileHeader[0][0] = '\0';  // labels line
+    logfileHeader[1][0] = '\0';  // units line
+
+    for (int i = 0; i < signalCount; i++) {
+        if (!signals[i].loggingEnabled)
+            continue;
+
+        // Append label
+        strncat(logfileHeader[0], signals[i].label, MAX_FORMATLENGTH - strlen(logfileHeader[0]) - 1);
+        strncat(logfileHeader[0], ",", MAX_FORMATLENGTH - strlen(logfileHeader[0]) - 1);
+
+        // Append unit
+        strncat(logfileHeader[1], signals[i].unit, MAX_FORMATLENGTH - strlen(logfileHeader[1]) - 1);
+        strncat(logfileHeader[1], ",", MAX_FORMATLENGTH - strlen(logfileHeader[1]) - 1);
+    }
+
+    // Remove trailing commas
+    size_t len0 = strlen(logfileHeader[0]);
+    if (len0 > 0 && logfileHeader[0][len0 - 1] == ',') {
+        logfileHeader[0][len0 - 1] = '\0';
+    }
+
+    size_t len1 = strlen(logfileHeader[1]);
+    if (len1 > 0 && logfileHeader[1][len1 - 1] == ',') {
+        logfileHeader[1][len1 - 1] = '\0';
+    }
+}
+
+int main(int argc, char *argv[]){
+
     char rc, opt;
     char *comport="/dev/ttyUSB0";
     int height,width,need_redraw=1,keypress=0;
     char *logfile="log/ecuscan.csv";
     char *configfile="config/signals.conf";
     int signalCount = 0;
+    char logfileHeader[2][MAX_FORMATLENGTH];
+    SignalConfig_t signals[MAX_LABELCOUNT];
+    int measBuffer[MAX_LABELCOUNT] = {0};
 
 
     while ((opt = getopt (argc, argv, "d:")) != -1 )
@@ -512,13 +607,17 @@ int main(int argc, char *argv[])
                       exit(0);
         }
     }
-
     
     signalCount = load_signal_config(configfile, &signals, MAX_LABELCOUNT);
+    if (signalCount <= 0) {
+        fprintf(stderr, "No valid signals loaded from config file.\n");
+        exit(1);
+    }
+
+
+    build_logfile_header(signalCount, &signals, logfileHeader);
 
     mkdir("log", 0755);  // creates log/ if it doesn't exist (UNIX)
-
-
 
     if ((rc=ssm_open(comport)) != 0)
     {
@@ -537,6 +636,7 @@ int main(int argc, char *argv[])
 
     while((keypress & 0xDF) != 'Q')
     {
+        measure_data(signalCount, &signals, &measBuffer);
         getmaxyx(stdscr,height,width);
         if ((height < 25) || (width < 80))
         {
@@ -554,7 +654,7 @@ int main(int argc, char *argv[])
                 draw_screen();
                 need_redraw=0;
             }
-            display_data();
+            display_data(&signals, &measBuffer);
         }
         keypress=getch();
         if ((keypress & 0xDF) == 'T') celsius    = (celsius    + 1) % 2;
@@ -565,7 +665,7 @@ int main(int argc, char *argv[])
         {   
             logh=fopen(logfile,"a");
             if (logh == NULL) logmode=2;
-            rc=fprintf(logh,"time,speed,rpm,tps,maf,batt,temp,O2Avg,lambda\n");
+            rc=fprintf(logh,"time,%s\ns,%s\n", logfileHeader[0], logfileHeader[1]);
             if (rc<0) logmode=2;
         }
         if ((logmode==0) && (logh != NULL))
