@@ -1,0 +1,21 @@
+{
+    "configurations": [
+        {
+            "name": "Debug ecuscan",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/bin/ecuscan",   // path to your compiled binary
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}/bin",               // or the runtime working directory
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "miDebuggerPath": "/usr/bin/gdb",              // adjust if you're using lldb or a different path
+            "setupCommands": [
+                { "description": "Enable pretty-printing", "text": "-enable-pretty-printing", "ignoreFailures": true }
+            ]
+        }
+    ],
+    "version": "2.0.0"
+}

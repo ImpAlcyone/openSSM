@@ -234,45 +234,35 @@ void Tempbar(int tempC)
     for (y=x;y<20;y++) printw(" ");
 }
 
-void display_data(SignalConfig_t *signals ,int *measbuffer)
+void display_data(int signalCount, SignalConfig_t *signals ,int *measbuffer)
 {
-    unsigned char data;
-    int rc,tps,rpm,ivd,batt,O2Avg,lambda;
-    int kmh,mph,tempC,tempF,speed,temp;
+    uint8_t data;
+    int lambda;
     int currentIdx = -1;
-    uint16_t address = 0x0;
+    
    
     /*----------*/
     /* Read KMH */
     /*----------*/
     
-    currentIdx = find_signal_index("vehicleSpeed", MAX_LABELCOUNT, &signals);
+    currentIdx = find_signal_index("vehicleSpeed", signalCount, &signals);
     if(currentIdx == -1){
-        address = 0x0;
+        data = 0;
     }else{
-        address = signals[currentIdx].address;
+        data = (uint8_t)measbuffer[currentIdx];
     }
 
-    if ((rc=ssm_query_ecu(address,&data,1)) != 0)
-    {
-        printf("ssm_query_ecu() returned %d\n",rc);
-        ssm_close();
-        exit(7);
-    }
-
-    kmh=data*2;
-    mph=(kmh*5)/8;
-
+   
     move(4,8);
     white_on_black();
     printw("Vehicle Speed");
 
     move(5,5);
-    bar((mph*100)/180);
+    bar((data*100)/180);
 
     move(5,26);
     white_on_black();
-    if (kilometers) printw("%3d km/h ",kmh); else printw("%3d mph ",mph);
+    printw("%3d km/h ",data);
    
     refresh();
 
@@ -280,31 +270,23 @@ void display_data(SignalConfig_t *signals ,int *measbuffer)
     /* Read RPM */
     /*----------*/
 
-    currentIdx = find_signal_index("engineSpeed", MAX_LABELCOUNT, &signals);
+    currentIdx = find_signal_index("engineSpeed", signalCount, &signals);
     if(currentIdx == -1){
-        address = 0x0;
+        data = 0;
     }else{
-        address = signals[currentIdx].address;
+        data = (uint8_t)measbuffer[currentIdx];
     }
-
-    if ((rc=ssm_query_ecu(address,&data,1)) != 0)
-    {
-        printf("ssm_query_ecu() returned %d\n",rc);
-        ssm_close();
-        exit(7);
-    }
-    rpm=data*25;
-
+   
     move(7,8);
     white_on_black();
     printw("Engine Speed");
 
     move(8,5);
-    bar(rpm*100/9000);
+    bar(data*100/9000);
 
     move(8,26);
     white_on_black();
-    printw(" %4d rpm",rpm);
+    printw(" %4d rpm",data);
    
     refresh();
 
@@ -312,32 +294,23 @@ void display_data(SignalConfig_t *signals ,int *measbuffer)
     /* Read TPS */
     /*----------*/
 
-    currentIdx = find_signal_index("throttlePosition", MAX_LABELCOUNT, &signals);
+    currentIdx = find_signal_index("throttlePosition", signalCount, &signals);
     if(currentIdx == -1){
-        address = 0x0;
+        data = 0;
     }else{
-        address = signals[currentIdx].address;
+        data = (uint8_t)measbuffer[currentIdx];
     }
-
-
-    if ((rc=ssm_query_ecu(address,&data,1)) != 0)
-    {
-        printf("ssm_query_ecu() returned %d\n",rc);
-        ssm_close();
-        exit(7);
-    }
-    tps=(data*500)/255;
-
+    
     move(10,7);
     white_on_black();
     printw("Throttle Position");
 
     move(11,5);
-    bar(tps/5);
+    bar(data/5);
 
     move(11,26);
     white_on_black();
-    printw(" %1d.%02dV (%3d%%)",tps/100,tps%100,tps/5);
+    printw(" %1d.%02dV (%3d%%)",data/100,data%100,data/5);
 
     refresh();
 
@@ -347,30 +320,21 @@ void display_data(SignalConfig_t *signals ,int *measbuffer)
 
     currentIdx = find_signal_index("ISUDutyValve", MAX_LABELCOUNT, &signals);
     if(currentIdx == -1){
-        address = 0x0;
+        data = 0;
     }else{
-        address = signals[currentIdx].address;
+        data = (uint8_t)measbuffer[currentIdx];
     }
-
-    if ((rc=ssm_query_ecu(address,&data,1)) != 0)
-    {
-        printf("ssm_query_ecu() returned %d\n",rc);
-        ssm_close();
-        exit(7);
-    }
-    
-    ivd=(data*100)/255;
-
+     
     move(13,8);
     white_on_black();
     printw("Idle Valve Duty");
 
     move(14,5);
-    bar(ivd/5);
+    bar(data/5);
 
     move(14,26);
     white_on_black();
-    printw(" %3d.%02dV ",ivd/100,ivd%100);
+    printw(" %3d%% ",data/5);
    
     refresh();
 
@@ -379,32 +343,22 @@ void display_data(SignalConfig_t *signals ,int *measbuffer)
     /*---------------------------*/
 
     currentIdx = find_signal_index("injectorPulseWidth", MAX_LABELCOUNT, &signals);
-    if(currentIdx == -1){
-        address = 0x0;
+   if(currentIdx == -1){
+        data = 0;
     }else{
-        address = signals[currentIdx].address;
+        data = (uint8_t)measbuffer[currentIdx];
     }
-
-
-    if ((rc=ssm_query_ecu(address,&data,1)) != 0)
-    {
-        printf("ssm_query_ecu() returned %d\n",rc);
-        ssm_close();
-        exit(7);
-    }
-    
-    batt=(data*8);
 
     move(16,8);
     white_on_black();
-    printw("Battery Voltage");
+    printw("Injector Pulse Width");
 
     move(17,5);
-    bar(batt/20);
+    bar(data/5);
 
     move(17,26);
     white_on_black();
-    printw(" %2d.%02dV ",batt/100,batt%100);
+    printw(" %4dms ",data);
 
     refresh();
 
@@ -414,31 +368,21 @@ void display_data(SignalConfig_t *signals ,int *measbuffer)
 
     currentIdx = find_signal_index("coolantTemp", MAX_LABELCOUNT, &signals);
     if(currentIdx == -1){
-        address = 0x0;
+        data = 0;
     }else{
-        address = signals[currentIdx].address;
+        data = (uint8_t)measbuffer[currentIdx];
     }
-
-    if ((rc=ssm_query_ecu(address,&data,1)) != 0)
-    {
-        printf("ssm_query_ecu() returned %d\n",rc);
-        ssm_close();
-        exit(7);
-    }
-    
-    tempC=(data-50);
-    tempF=(tempC*9)/5+32;
-
+   
     move(4,47);
     white_on_black();
     printw("Coolant Temperature");
 
     move(5,47);
-    Tempbar(tempC);
+    Tempbar(data);
 
     move(5,68);
     white_on_black();
-    if (celsius) printw(" %3d C ",tempC); else printw(" %3d F ",tempF);
+    if (celsius) printw(" %3d C ",data);
 
     refresh();
 
@@ -448,30 +392,21 @@ void display_data(SignalConfig_t *signals ,int *measbuffer)
 
     currentIdx = find_signal_index("O2Average", MAX_LABELCOUNT, &signals);
     if(currentIdx == -1){
-        address = 0x0;
+        data = 0;
     }else{
-        address = signals[currentIdx].address;
-    }
-
-    if ((rc=ssm_query_ecu(address,&data,1)) != 0)
-    {
-        printf("ssm_query_ecu() returned %d\n",rc);
-        ssm_close();
-        exit(7);
+        data = (uint8_t)measbuffer[currentIdx];
     }
     
-    O2Avg=(data*5000)/512;
-
     move(7,49);
     white_on_black();
     printw("O2 Sensor Average");
 
     move(8,47);
-    bar(O2Avg/25);
+    bar(data/25);
 
     move(8,68);
     white_on_black();
-    printw(" %3d mV ",O2Avg); 
+    printw(" %4d mV ",data); 
   
     refresh();
 
@@ -480,7 +415,7 @@ void display_data(SignalConfig_t *signals ,int *measbuffer)
     /*------------------*/
 
     // Fake narrowband lambda: 0.88 to 1.12 scaled by 100
-    lambda = 112 - ((O2Avg - 100) * 24) / 800;
+    lambda = 112 - ((data - 100) * 24) / 800;
 
     // Clamp
     if (lambda < 88) lambda = 88;
@@ -527,25 +462,37 @@ void measure_data(int signalCount,
 
     //Loop, poll, convert and write into buffer
     for(int i = 0; i < signalCount; i++){
-        if(signals[i].loggingEnabled){
-           if ((rc=ssm_query_ecu(signals[i].address,&rawData,1)) != 0){   
-                printf("ssm_query_ecu() returned %d\n",rc);
-                ssm_close();
-                exit(7);
-            }
+        if(0 == signals[i].loggingEnabled){
+            continue;
+        }
+        if ((rc=ssm_query_ecu(signals[i].address,&rawData,1)) != 0){   
+            printf("ssm_query_ecu() returned %d\n",rc);
+            ssm_close();
+            exit(7);
+        }
         
-            measbuffer[i] = ((rawData - signals[i].conversionOffset) * signals[i].conversionMulFactor) / signals[i].conversionDivFactor;
+        measbuffer[i] = ((rawData - signals[i].conversionOffset) * signals[i].conversionMulFactor) / signals[i].conversionDivFactor;
+        
+        if (logmode == 1) {
+            snprintf(valueStr, sizeof(valueStr), signals[i].format, measbuffer[i]);
 
+            if (logLine[0] != '\0') {
+                strncat(logLine, ",", MAX_OUTPUTLINELENGTH - strlen(logLine) - 1);
+            }
+            strncat(logLine, valueStr, MAX_OUTPUTLINELENGTH - strlen(logLine) - 1); 
         }
     }
    
-    if (logmode == 1)
-    {
+    if (logmode == 1){
         gettimeofday(&now,NULL);
         elapsed = now.tv_sec - start.tv_sec;
+        char printLine[MAX_OUTPUTLINELENGTH];
 
-        rc=fprintf(logh,"%d,%d,%d,%d,%d.%02d,%d.%02d,%d,%d,%d.%02d\n",\
-        (now.tv_sec-start.tv_sec),speed,rpm,tps/5,ivd/100,ivd%100,batt/100,batt%100,temp,O2Avg,lambda/100,lambda%100);
+        snprintf(printLine, sizeof(printLine), "%d,%s\n", elapsed, logLine);
+        rc = fputs(printLine, logh);
+
+        // rc=fprintf(logh,"%d,%d,%d,%d,%d.%02d,%d.%02d,%d,%d,%d.%02d\n",\
+        // (now.tv_sec-start.tv_sec),speed,rpm,tps/5,ivd/100,ivd%100,batt/100,batt%100,temp,O2Avg,lambda/100,lambda%100);
         if (rc<0) logmode=2;
     }
 
@@ -654,7 +601,7 @@ int main(int argc, char *argv[]){
                 draw_screen();
                 need_redraw=0;
             }
-            display_data(&signals, &measBuffer);
+            display_data(signalCount, &signals, &measBuffer);
         }
         keypress=getch();
         if ((keypress & 0xDF) == 'T') celsius    = (celsius    + 1) % 2;
