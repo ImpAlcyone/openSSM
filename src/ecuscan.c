@@ -33,6 +33,10 @@
 #include <string.h>
 #include <stdint.h>
 #include <sys/stat.h>
+#include <sys/time.h>
+#include <time.h>
+
+#include "ssm.h"
 
 #define MAX_LABELLENGTH 128
 #define MAX_UNITLENGTH 16
@@ -188,7 +192,7 @@ void draw_screen()
     move(1,28);
     printw("=======================");
     move(24,1);
-    printw("Q:Quit   T:Toggle C/F   M:Toggle MPH/KMH   L:Toggle Logging");
+    printw("Q:Quit L:Toggle Logging");
     refresh();
 }
 
@@ -236,7 +240,7 @@ void Tempbar(int tempC)
 
 void display_data(int signalCount, SignalConfig_t *signals ,int *measbuffer)
 {
-    uint8_t data;
+    int data;
     int lambda;
     int currentIdx = -1;
     
@@ -245,11 +249,11 @@ void display_data(int signalCount, SignalConfig_t *signals ,int *measbuffer)
     /* Read KMH */
     /*----------*/
     
-    currentIdx = find_signal_index("vehicleSpeed", signalCount, &signals);
+    currentIdx = find_signal_index("vehicleSpeed", signalCount, signals);
     if(currentIdx == -1){
         data = 0;
     }else{
-        data = (uint8_t)measbuffer[currentIdx];
+        data = measbuffer[currentIdx];
     }
 
    
@@ -270,11 +274,11 @@ void display_data(int signalCount, SignalConfig_t *signals ,int *measbuffer)
     /* Read RPM */
     /*----------*/
 
-    currentIdx = find_signal_index("engineSpeed", signalCount, &signals);
+    currentIdx = find_signal_index("engineSpeed", signalCount, signals);
     if(currentIdx == -1){
         data = 0;
     }else{
-        data = (uint8_t)measbuffer[currentIdx];
+        data = measbuffer[currentIdx];
     }
    
     move(7,8);
@@ -294,11 +298,11 @@ void display_data(int signalCount, SignalConfig_t *signals ,int *measbuffer)
     /* Read TPS */
     /*----------*/
 
-    currentIdx = find_signal_index("throttlePosition", signalCount, &signals);
+    currentIdx = find_signal_index("throttlePosition", signalCount, signals);
     if(currentIdx == -1){
         data = 0;
     }else{
-        data = (uint8_t)measbuffer[currentIdx];
+        data = measbuffer[currentIdx];
     }
     
     move(10,7);
@@ -306,11 +310,11 @@ void display_data(int signalCount, SignalConfig_t *signals ,int *measbuffer)
     printw("Throttle Position");
 
     move(11,5);
-    bar(data/5);
+    bar(data);
 
     move(11,26);
     white_on_black();
-    printw(" %1d.%02dV (%3d%%)",data/100,data%100,data/5);
+    printw(" %1d.%02dV (%3d%%)",data/100,data%100,data);
 
     refresh();
 
@@ -318,11 +322,11 @@ void display_data(int signalCount, SignalConfig_t *signals ,int *measbuffer)
     /* Read Idle Valve Duty */
     /*----------------------*/
 
-    currentIdx = find_signal_index("ISUDutyValve", MAX_LABELCOUNT, &signals);
+    currentIdx = find_signal_index("ISUDutyValve", signalCount, signals);
     if(currentIdx == -1){
         data = 0;
     }else{
-        data = (uint8_t)measbuffer[currentIdx];
+        data = measbuffer[currentIdx];
     }
      
     move(13,8);
@@ -330,11 +334,11 @@ void display_data(int signalCount, SignalConfig_t *signals ,int *measbuffer)
     printw("Idle Valve Duty");
 
     move(14,5);
-    bar(data/5);
+    bar(data);
 
     move(14,26);
     white_on_black();
-    printw(" %3d%% ",data/5);
+    printw(" %3d%% ",data);
    
     refresh();
 
@@ -342,11 +346,11 @@ void display_data(int signalCount, SignalConfig_t *signals ,int *measbuffer)
     /* Read Injector Pulse width */
     /*---------------------------*/
 
-    currentIdx = find_signal_index("injectorPulseWidth", MAX_LABELCOUNT, &signals);
+    currentIdx = find_signal_index("injectorPulseWidth", signalCount, signals);
    if(currentIdx == -1){
         data = 0;
     }else{
-        data = (uint8_t)measbuffer[currentIdx];
+        data = measbuffer[currentIdx];
     }
 
     move(16,8);
@@ -366,11 +370,11 @@ void display_data(int signalCount, SignalConfig_t *signals ,int *measbuffer)
     /* Read Temp */
     /*-----------*/
 
-    currentIdx = find_signal_index("coolantTemp", MAX_LABELCOUNT, &signals);
+    currentIdx = find_signal_index("coolantTemp", signalCount, signals);
     if(currentIdx == -1){
         data = 0;
     }else{
-        data = (uint8_t)measbuffer[currentIdx];
+        data = measbuffer[currentIdx];
     }
    
     move(4,47);
@@ -390,11 +394,11 @@ void display_data(int signalCount, SignalConfig_t *signals ,int *measbuffer)
     /* Read O2Avg */
     /*------------*/
 
-    currentIdx = find_signal_index("O2Average", MAX_LABELCOUNT, &signals);
+    currentIdx = find_signal_index("O2Average", signalCount, signals);
     if(currentIdx == -1){
         data = 0;
     }else{
-        data = (uint8_t)measbuffer[currentIdx];
+        data = measbuffer[currentIdx];
     }
     
     move(7,49);
@@ -450,73 +454,103 @@ void display_data(int signalCount, SignalConfig_t *signals ,int *measbuffer)
 
 }
     
-void measure_data(int signalCount, 
-    SignalConfig_t *signals, 
-    int *measbuffer){
+void measure_data(int signalCount, SignalConfig_t *signals, int *measbuffer){
     
-    int rawData = 0;
-    char logLine[MAX_OUTPUTLINELENGTH];
-    char valueStr[32];  // temporary buffer for each value
-    logLine[0] = '\0';  // start with empty string
-    int elapsed = 0;
+    char rawData = 0;
+    long elapsed_ms = 0;
 
-    //Loop, poll, convert and write into buffer
-    for(int i = 0; i < signalCount; i++){
-        if(0 == signals[i].loggingEnabled){
+    for (int pollIdx = 0; pollIdx < signalCount; pollIdx++) {
+        if (!signals[pollIdx].loggingEnabled) {
             continue;
         }
-        if ((rc=ssm_query_ecu(signals[i].address,&rawData,1)) != 0){   
-            printf("ssm_query_ecu() returned %d\n",rc);
-            ssm_close();
-            exit(7);
+
+        if ((rc = ssm_query_ecu(signals[pollIdx].address, &rawData, 1)) != 0) {
+            rawData = 0x0; // failed read gets default
         }
-        
-        measbuffer[i] = ((rawData - signals[i].conversionOffset) * signals[i].conversionMulFactor) / signals[i].conversionDivFactor;
-        
+
+        // Update the buffer for this signal only
+        measbuffer[pollIdx] = ((rawData + signals[pollIdx].conversionOffset) * 
+                               signals[pollIdx].conversionMulFactor) / 
+                               signals[pollIdx].conversionDivFactor;
+
         if (logmode == 1) {
-            snprintf(valueStr, sizeof(valueStr), signals[i].format, measbuffer[i]);
+            // Get time with milliseconds precision
+            gettimeofday(&now, NULL);
+            elapsed_ms = (now.tv_sec - start.tv_sec) * 1000L +
+                         (now.tv_usec - start.tv_usec) / 1000L;
 
-            if (logLine[0] != '\0') {
-                strncat(logLine, ",", MAX_OUTPUTLINELENGTH - strlen(logLine) - 1);
+            char logLine[MAX_OUTPUTLINELENGTH];
+            char *p = logLine;
+            size_t remaining = sizeof(logLine);
+            int written;
+
+            // Write timestamp
+            written = snprintf(p, remaining, "%ld.%03ld", elapsed_ms / 1000L, elapsed_ms % 1000L);
+            if (written < 0 || (size_t)written >= remaining) {
+                continue;
             }
-            strncat(logLine, valueStr, MAX_OUTPUTLINELENGTH - strlen(logLine) - 1); 
+            p += written;
+            remaining -= written;
+
+            // Add all values from measbuffer in consistent column order
+            for (int logIdx = 0; logIdx < signalCount; logIdx++) {
+                if (!signals[logIdx].loggingEnabled)
+                    continue;
+
+                // Add comma
+                written = snprintf(p, remaining, ",");
+                if (written < 0 || (size_t)written >= remaining) break;
+                p += written;
+                remaining -= written;
+
+                // Format value
+                written = snprintf(p, remaining, signals[logIdx].format, measbuffer[logIdx]);
+                if (written < 0 || (size_t)written >= remaining) break;
+                p += written;
+                remaining -= written;
+            }
+
+            // Newline
+            snprintf(p, remaining, "\n");
+
+            // Write to log
+            rc = fputs(logLine, logh);
+            if (rc < 0) logmode = 2;
         }
     }
+}    
    
-    if (logmode == 1){
-        gettimeofday(&now,NULL);
-        elapsed = now.tv_sec - start.tv_sec;
-        char printLine[MAX_OUTPUTLINELENGTH];
+    /* if (logmode == 1){
+        
+        
+    //     char printLine[MAX_OUTPUTLINELENGTH];
 
-        snprintf(printLine, sizeof(printLine), "%d,%s\n", elapsed, logLine);
-        rc = fputs(printLine, logh);
+    //     snprintf(printLine, sizeof(printLine), "%d,%s\n", elapsed, logLine);
+    //     rc = fputs(printLine, logh);
 
-        // rc=fprintf(logh,"%d,%d,%d,%d,%d.%02d,%d.%02d,%d,%d,%d.%02d\n",\
-        // (now.tv_sec-start.tv_sec),speed,rpm,tps/5,ivd/100,ivd%100,batt/100,batt%100,temp,O2Avg,lambda/100,lambda%100);
-        if (rc<0) logmode=2;
-    }
+    //     // rc=fprintf(logh,"%d,%d,%d,%d,%d.%02d,%d.%02d,%d,%d,%d.%02d\n",\
+    //     // (now.tv_sec-start.tv_sec),speed,rpm,tps/5,ivd/100,ivd%100,batt/100,batt%100,temp,O2Avg,lambda/100,lambda%100);
+    //     if (rc<0) logmode=2;
+    */
 
 
-}
 
-void build_logfile_header(int signalCount, 
-    const SignalConfig_t *signals, 
-    char logfileHeader[2][MAX_FORMATLENGTH]) {
+
+void build_logfile_header(int signalCount, const SignalConfig_t *signals, char logfileHeader[2][MAX_OUTPUTLINELENGTH]) {
 
     logfileHeader[0][0] = '\0';  // labels line
     logfileHeader[1][0] = '\0';  // units line
-
     for (int i = 0; i < signalCount; i++) {
         if (!signals[i].loggingEnabled)
             continue;
 
         // Append label
-        strncat(logfileHeader[0], signals[i].label, MAX_FORMATLENGTH - strlen(logfileHeader[0]) - 1);
-        strncat(logfileHeader[0], ",", MAX_FORMATLENGTH - strlen(logfileHeader[0]) - 1);
+        strncat(logfileHeader[0], signals[i].label, MAX_OUTPUTLINELENGTH - strlen(logfileHeader[0]) - 1);
+        strncat(logfileHeader[0], ",", MAX_OUTPUTLINELENGTH - strlen(logfileHeader[0]) - 1);
 
         // Append unit
-        strncat(logfileHeader[1], signals[i].unit, MAX_FORMATLENGTH - strlen(logfileHeader[1]) - 1);
-        strncat(logfileHeader[1], ",", MAX_FORMATLENGTH - strlen(logfileHeader[1]) - 1);
+        strncat(logfileHeader[1], signals[i].unit, MAX_OUTPUTLINELENGTH - strlen(logfileHeader[1]) - 1);
+        strncat(logfileHeader[1], ",", MAX_OUTPUTLINELENGTH - strlen(logfileHeader[1]) - 1);
     }
 
     // Remove trailing commas
@@ -531,17 +565,30 @@ void build_logfile_header(int signalCount,
     }
 }
 
+// Function to get the current timestamp as a formatted string
+void get_time_string(char *time_str, size_t max_len, struct timeval *start) {
+    struct tm *tm_info;
+    char time_buf[32];
+
+    tm_info = localtime(&start->tv_sec);
+
+    strftime(time_buf, sizeof(time_buf), "%Y-%m-%d_%H-%M-%S", tm_info);
+    snprintf(time_str, max_len, "%s", time_buf);
+}
+
+
 int main(int argc, char *argv[]){
 
     char rc, opt;
     char *comport="/dev/ttyUSB0";
     int height,width,need_redraw=1,keypress=0;
-    char *logfile="log/ecuscan.csv";
+    char logfile[256]="log/ecuscan.csv";
     char *configfile="config/signals.conf";
     int signalCount = 0;
-    char logfileHeader[2][MAX_FORMATLENGTH];
+    char logfileHeader[2][MAX_OUTPUTLINELENGTH];
     SignalConfig_t signals[MAX_LABELCOUNT];
     int measBuffer[MAX_LABELCOUNT] = {0};
+    char time_str[32];
 
 
     while ((opt = getopt (argc, argv, "d:")) != -1 )
@@ -550,19 +597,19 @@ int main(int argc, char *argv[]){
         {
             case 'd': comport=optarg;
                       break;
-            default : printf("Usage: tcuscan [-d serial device]\n");
+            default : printf("Usage: ecuscan [-d serial device]\n");
                       exit(0);
         }
     }
     
-    signalCount = load_signal_config(configfile, &signals, MAX_LABELCOUNT);
+    signalCount = load_signal_config(configfile, signals, MAX_LABELCOUNT);
     if (signalCount <= 0) {
         fprintf(stderr, "No valid signals loaded from config file.\n");
         exit(1);
     }
 
 
-    build_logfile_header(signalCount, &signals, logfileHeader);
+    build_logfile_header(signalCount, signals, logfileHeader);
 
     mkdir("log", 0755);  // creates log/ if it doesn't exist (UNIX)
 
@@ -581,9 +628,15 @@ int main(int argc, char *argv[]){
 
     gettimeofday(&start,NULL);
 
+    // Get current time for logfile naming
+    get_time_string(time_str, sizeof(time_str), &start);
+
+    // Modify logfile name with the current time
+    snprintf(logfile, sizeof(logfile), "log/%s_ecuscan.csv", time_str);
+
     while((keypress & 0xDF) != 'Q')
     {
-        measure_data(signalCount, &signals, &measBuffer);
+        measure_data(signalCount, signals, measBuffer);
         getmaxyx(stdscr,height,width);
         if ((height < 25) || (width < 80))
         {
@@ -601,11 +654,9 @@ int main(int argc, char *argv[]){
                 draw_screen();
                 need_redraw=0;
             }
-            display_data(signalCount, &signals, &measBuffer);
+            display_data(signalCount, signals, measBuffer);
         }
         keypress=getch();
-        if ((keypress & 0xDF) == 'T') celsius    = (celsius    + 1) % 2;
-        if ((keypress & 0xDF) == 'M') kilometers = (kilometers + 1) % 2;
         if ((keypress & 0xDF) == 'L' && (logmode < 2)) logmode=(logmode+1) % 2;
 
         if ((logmode==1) && (logh == NULL))
