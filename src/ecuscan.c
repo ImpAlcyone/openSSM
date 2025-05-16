@@ -218,6 +218,27 @@ void bar(int percent)
     for (y=x;y<20;y++) printw(" ");
 }
 
+void absbar(int value, int min, int max){
+    {
+    int x,y,percent;
+
+    if (value < ((min+max)>>1)){
+        black_on_red();
+    }else{
+        black_on_green();
+    }
+        if (value < 130) 
+            black_on_green();
+
+    percent=((value+min)*100)/(min+max);
+    if (percent>100) percent=100;
+
+    for (x=0;x<percent/5;x++) printw(" ");
+    black_on_yellow();
+    for (y=x;y<20;y++) printw(" ");
+}
+}
+
 void Tempbar(int tempC)
 {
     int x,y,percent;
@@ -241,7 +262,6 @@ void Tempbar(int tempC)
 void display_data(int signalCount, SignalConfig_t *signals ,int *measbuffer)
 {
     int data;
-    int lambda;
     int currentIdx = -1;
     
    
@@ -390,11 +410,11 @@ void display_data(int signalCount, SignalConfig_t *signals ,int *measbuffer)
 
     refresh();
 
-    /*------------*/
-    /* Read O2Avg */
-    /*------------*/
+    /*-----------------------*/
+    /* Read Ignition advance */
+    /*-----------------------*/
 
-    currentIdx = find_signal_index("O2Average", signalCount, signals);
+    currentIdx = find_signal_index("ignitionAdvance", signalCount, signals);
     if(currentIdx == -1){
         data = 0;
     }else{
@@ -403,39 +423,87 @@ void display_data(int signalCount, SignalConfig_t *signals ,int *measbuffer)
     
     move(7,49);
     white_on_black();
-    printw("O2 Sensor Average");
+    printw("Ignition Advance");
 
     move(8,47);
-    bar(data/25);
+    bar(data/2.55);
 
     move(8,68);
     white_on_black();
-    printw(" %4d mV ",data); 
+    printw(" %3d degCrk ",data); 
   
     refresh();
 
-    /*------------------*/
-    /* Calculate Lambda */
-    /*------------------*/
+    /*-----------------------*/
+    /* Read Ignition Timing  */
+    /*-----------------------*/
 
-    // Fake narrowband lambda: 0.88 to 1.12 scaled by 100
-    lambda = 112 - ((data - 100) * 24) / 800;
-
-    // Clamp
-    if (lambda < 88) lambda = 88;
-    if (lambda > 112) lambda = 112;
-
+    currentIdx = find_signal_index("ignitionTiming", signalCount, signals);
+    if(currentIdx == -1){
+        data = 0;
+    }else{
+        data = measbuffer[currentIdx];
+    }
+    
     move(10,49);
     white_on_black();
-    printw("Lambda");
+    printw("Ignition Advance");
 
     move(11,47);
-    bar(lambda/25);
+    bar(data/2.55);
 
     move(11,68);
     white_on_black();
-    printw(" %d.%02d - ", lambda/100, lambda%100); 
+    printw(" %3d degCrk ",data); 
+  
+    refresh();
+   
+    /*-----------------------*/
+    /* Read Knock correction */
+    /*-----------------------*/
 
+    currentIdx = find_signal_index("knockCorrection", signalCount, signals);
+    if(currentIdx == -1){
+        data = 0;
+    }else{
+        data = measbuffer[currentIdx];
+    }
+    
+    move(13,49);
+    white_on_black();
+    printw("Knock correction");
+
+    move(14,47);
+    bar(data/2.55);
+
+    move(14,68);
+    white_on_black();
+    printw(" %3d - ",data); 
+  
+    refresh();
+
+       /*-----------------------*/
+    /* Read Knock correction */
+    /*-----------------------*/
+
+    currentIdx = find_signal_index("AFCorrection", signalCount, signals);
+    if(currentIdx == -1){
+        data = 0;
+    }else{
+        data = measbuffer[currentIdx];
+    }
+    
+    move(16,49);
+    white_on_black();
+    printw("AFR correction");
+
+    move(17,47);
+    bar((data+128)/100);
+
+    move(17,68);
+    white_on_black();
+    printw(" %3d - ",data); 
+  
     refresh();
 
      /*---------*/
@@ -456,7 +524,7 @@ void display_data(int signalCount, SignalConfig_t *signals ,int *measbuffer)
     
 void measure_data(int signalCount, SignalConfig_t *signals, int *measbuffer){
     
-    char rawData = 0;
+    uint8_t rawData = 0;
     long elapsed_ms = 0;
 
     for (int pollIdx = 0; pollIdx < signalCount; pollIdx++) {
@@ -465,7 +533,7 @@ void measure_data(int signalCount, SignalConfig_t *signals, int *measbuffer){
         }
 
         if ((rc = ssm_query_ecu(signals[pollIdx].address, &rawData, 1)) != 0) {
-            rawData = 0x0; // failed read gets default
+            continue; // failed read is skipped
         }
 
         // Update the buffer for this signal only
@@ -520,22 +588,7 @@ void measure_data(int signalCount, SignalConfig_t *signals, int *measbuffer){
     }
 }    
    
-    /* if (logmode == 1){
-        
-        
-    //     char printLine[MAX_OUTPUTLINELENGTH];
-
-    //     snprintf(printLine, sizeof(printLine), "%d,%s\n", elapsed, logLine);
-    //     rc = fputs(printLine, logh);
-
-    //     // rc=fprintf(logh,"%d,%d,%d,%d,%d.%02d,%d.%02d,%d,%d,%d.%02d\n",\
-    //     // (now.tv_sec-start.tv_sec),speed,rpm,tps/5,ivd/100,ivd%100,batt/100,batt%100,temp,O2Avg,lambda/100,lambda%100);
-    //     if (rc<0) logmode=2;
-    */
-
-
-
-
+ 
 void build_logfile_header(int signalCount, const SignalConfig_t *signals, char logfileHeader[2][MAX_OUTPUTLINELENGTH]) {
 
     logfileHeader[0][0] = '\0';  // labels line
@@ -610,7 +663,7 @@ int main(int argc, char *argv[]){
 
 
     build_logfile_header(signalCount, signals, logfileHeader);
-
+    
     mkdir("log", 0755);  // creates log/ if it doesn't exist (UNIX)
 
     if ((rc=ssm_open(comport)) != 0)
@@ -663,8 +716,9 @@ int main(int argc, char *argv[]){
         {   
             logh=fopen(logfile,"a");
             if (logh == NULL) logmode=2;
+            
             rc=fprintf(logh,"time,%s\ns,%s\n", logfileHeader[0], logfileHeader[1]);
-            if (rc<0) logmode=2;
+            //if (rc<0) logmode=2;
         }
         if ((logmode==0) && (logh != NULL))
         {

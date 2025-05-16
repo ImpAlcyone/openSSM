@@ -469,7 +469,7 @@ int send_query(unsigned char query_command)
 /* in the buffer so that you can analyse how the data changes over time.    */
 /*==========================================================================*/
 
-int ssm_query_ecu(int address, char *buffer, int n)
+int ssm_query_ecu(int address, __u_char *buffer, int n)
 {
 	int rc, retries, timeout;
 
@@ -550,7 +550,7 @@ int ssm_query_ecu(int address, char *buffer, int n)
 /* in the buffer so that you can analyse how the data changes over time.    */
 /*==========================================================================*/
 
-int ssm_query_tcu(int address, char *buffer, int n)
+int ssm_query_tcu(int address, __u_char *buffer, int n)
 {
 	int rc, retries, timeout;
 
@@ -631,7 +631,7 @@ int ssm_query_tcu(int address, char *buffer, int n)
 /* in the buffer so that you can analyse how the data changes over time.    */
 /*==========================================================================*/
 
-int ssm_query_4ws(int address, char *buffer, int n)
+int ssm_query_4ws(int address, __u_char *buffer, int n)
 {
 	int rc, retries, timeout;
 

@@ -46,7 +46,7 @@ int ssm_reset();
 /* in the buffer so that you can analyse how the data changes over time.    */
 /*--------------------------------------------------------------------------*/
 
-int ssm_query_ecu(int address, char *buffer, int n);
+int ssm_query_ecu(int address, __u_char *buffer, int n);
 
 /*--------------------------------------------------------------------------*/
 /* ssm_query_tcu() tells the TCU to start sending the contents of a given   */
@@ -54,7 +54,7 @@ int ssm_query_ecu(int address, char *buffer, int n);
 /* in the buffer so that you can analyse how the data changes over time.    */
 /*--------------------------------------------------------------------------*/
 
-int ssm_query_tcu(int address, char *buffer, int n);
+int ssm_query_tcu(int address, __u_char *buffer, int n);
 
 /*--------------------------------------------------------------------------*/
 /* ssm_query_4ws() tells the 4WS to start sending the contents of a given   */
@@ -62,13 +62,13 @@ int ssm_query_tcu(int address, char *buffer, int n);
 /* in the buffer so that you can analyse how the data changes over time.    */
 /*--------------------------------------------------------------------------*/
 
-int ssm_query_4ws(int address, char *buffer, int n);
+int ssm_query_4ws(int address, __u_char *buffer, int n);
 
 /*-----------------------------------------------------*/
 /* ssm_current() returns the data currently being sent */
 /*-----------------------------------------------------*/
 
-int ssm_current(int *address,char *data);
+int ssm_current(int *address,__u_char *data);
 	
 /*---------------------------------------*/ 
 // ssm_close() shuts down the connection */
