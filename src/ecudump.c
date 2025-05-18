@@ -151,11 +151,18 @@ int main(int argc, char *argv[])
 	/* Dump the ECU address space to file            */
 	/* Takes over 3 hours if you dump the whole lot  */
 	/*-----------------------------------------------*/
-	
+	unsigned int retries = 0;
 	for (address=start; address<=end; address++)
-	{
-		if ((rc=ssm_query_ecu(address,&data,1)) != 0)
-		{
+	{	
+		retries = 0;
+		while(0 != (rc=ssm_query_ecu(address,&data,1))){
+			sleep(5);
+			if(retries > 10){
+				break;
+			}
+			retries++;
+		}
+		if (rc != 0){
 			printf("ssm_query_ecu() returned %d\n",rc);
 			ssm_close();
 			fclose(fh);

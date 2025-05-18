@@ -38,10 +38,12 @@
 
 #include "ssm.h"
 
+#define MAX_LABELCOUNT 32
 #define MAX_LABELLENGTH 128
 #define MAX_UNITLENGTH 16
-#define MAX_LABELCOUNT 32
+#define MAX_ADDRESSLENGTH 10
 #define MAX_FORMATLENGTH 16
+#define MAX_CONVERSIONLENGTH 16
 #define MAX_OUTPUTFORMATLENGTH 512
 #define MAX_OUTPUTLINELENGTH 1024
 
@@ -66,70 +68,146 @@ typedef struct {
 } SignalConfig_t;
 
 int load_signal_config(const char *filename, SignalConfig_t *signals, int max_label_count) {
+    
     FILE *file = fopen(filename, "r");
     if (!file) {
         perror("Failed to open signal config file");
         return -1;
     }
 
+    
     char *line = NULL;
     size_t len = 0;
-    ssize_t read;
-    int count = 0;
+    ssize_t readCharCount;
+    int signalCount = 0;
+    size_t max_field_charCount = 0;
 
-    while ((read = getline(&line, &len, file)) != -1 && count < max_label_count) {
+    char loggingEnabled = '\0';
+    char label[MAX_LABELLENGTH] = {'\0'};
+    char unit[MAX_UNITLENGTH] = {'\0'};
+    char address[MAX_ADDRESSLENGTH] = {'\0'};
+    char format[MAX_FORMATLENGTH] = {'\0'};
+    char convOffset[MAX_CONVERSIONLENGTH] = {'\0'};
+    char convMulFac[MAX_CONVERSIONLENGTH] = {'\0'};
+    char convDivFac[MAX_CONVERSIONLENGTH] = {'\0'};
+    uint64_t writeCount = 0;
+    int fieldCounter = 0;
+    uint8_t changeField = 1;
+    char *pCurrentWriteChar = NULL;
+
+
+    while ((readCharCount = getline(&line, &len, file)) != -1 && signalCount < max_label_count) {
+        
         // Skip header or comments
         if (line[0] == '#') continue;
 
-        // Remove newline if present
-        line[strcspn(line, "\r\n")] = 0;
+        // reset 
+        loggingEnabled = '\0';
+        memset(label, '\0', sizeof(label));
+        memset(unit, '\0', sizeof(unit));
+        memset(address, '\0', sizeof(address));
+        memset(format, '\0', sizeof(format));
+        memset(convOffset, '\0', sizeof(convOffset));
+        memset(convMulFac, '\0', sizeof(convMulFac));
+        memset(convDivFac, '\0', sizeof(convDivFac));
+        writeCount = 0;
+        fieldCounter = 0;
+        changeField = 1;
+        pCurrentWriteChar = NULL;
 
-        uint8_t loggingEnabled = atoi(strtok(line, ","));
-        char *label = strtok(NULL, ",");
-        char *unit = strtok(NULL, ",");
-        char *addr_str = strtok(NULL, ",");
-        char *format = strtok(NULL, ",");
-        char *convOffset = strtok(NULL, ",");
-        char *convMulFac = strtok(NULL, ",");
-        char *convDivFac = strtok(NULL, ",");
+        // loop the current line characters
+        for(int writeCharIdx = 0; writeCharIdx < readCharCount; writeCharIdx++){
+            if(line[writeCharIdx] == ','){
+                fieldCounter++;
+                changeField = 1;
+                continue;
+                // skip commas, change to next struct field
+            }else if(line[writeCharIdx] == '\n'){
+                break;
+                // exit loop, read next line
+            }
 
+            if(changeField){
+                writeCount = 0;
+                switch (fieldCounter)
+                {
+                    case 0:
+                        pCurrentWriteChar = &loggingEnabled;
+                        max_field_charCount = 1;
+                        break;
+                    
+                    case 1:
+                        pCurrentWriteChar = label;
+                        max_field_charCount = MAX_LABELLENGTH;
+                        break;
 
-        signals[count].loggingEnabled = loggingEnabled;
+                    case 2:
+                        pCurrentWriteChar = unit;
+                        max_field_charCount = MAX_UNITLENGTH;
+                        break;
 
-        if (!label || !unit || !addr_str ){
-            continue;
+                    case 3:
+                        pCurrentWriteChar = address;
+                        max_field_charCount = MAX_ADDRESSLENGTH;
+                        break;
+
+                    case 4:
+                        pCurrentWriteChar = format;
+                        max_field_charCount = MAX_FORMATLENGTH;
+                        break;
+
+                    case 5:
+                        pCurrentWriteChar = convOffset;
+                        max_field_charCount = MAX_CONVERSIONLENGTH;
+                        break;
+
+                    case 6:
+                        pCurrentWriteChar = convMulFac;
+                        max_field_charCount = MAX_CONVERSIONLENGTH;
+                        break;
+
+                    case 7:
+                        pCurrentWriteChar = convDivFac;
+                        max_field_charCount = MAX_CONVERSIONLENGTH;
+                        break;
+
+                    default:
+                        break;
+                }
+                changeField = 0;
+            }
+            if(writeCount >= max_field_charCount){
+                //don't write to buffer if counter is greater than buffer size
+                continue;
+            }
+            if(pCurrentWriteChar != NULL){
+                // write current character to corresponding buffer
+                *pCurrentWriteChar = line[writeCharIdx];
+                // increase pointer to destination string character
+                pCurrentWriteChar++;
+                writeCount++;
+            }
         }
-            
-        strncpy(signals[count].label, label, sizeof(signals[count].label) - 1);
-        signals[count].label[sizeof(signals[count].label) - 1] = '\0';
 
-        strncpy(signals[count].unit, unit, sizeof(signals[count].unit) - 1);
-        signals[count].unit[sizeof(signals[count].unit) - 1] = '\0';
+        // write values to current signal
+        signals[signalCount].loggingEnabled = (u_int8_t)atoi(&loggingEnabled);
+        strncpy(signals[signalCount].label, label, MAX_LABELLENGTH);
+        strncpy(signals[signalCount].unit, unit, MAX_UNITLENGTH);
+        u_int tempAddress = 0x0;
+        sscanf(address, "%X", &tempAddress);
+        signals[signalCount].address = (uint16_t)tempAddress;
+        strncpy(signals[signalCount].format, format, MAX_FORMATLENGTH);
+        signals[signalCount].conversionOffset = atoi(convOffset);
+        signals[signalCount].conversionMulFactor = atoi(convMulFac);
+        signals[signalCount].conversionDivFactor = atoi(convDivFac);
 
-        unsigned int addr;
-        if (sscanf(addr_str, "%x", &addr) == 1) {
-            signals[count].address = (uint16_t)addr;
-        }
-
-        if (format) {
-            strncpy(signals[count].format, format, sizeof(signals[count].format) - 1);
-            signals[count].format[sizeof(signals[count].format) - 1] = '\0';    
-        } else {
-            strcpy(signals[count].format, "%d");
-        }   
-           
-        signals[count].conversionOffset = convOffset ? atoi(convOffset) : 0;
-            
-        signals[count].conversionMulFactor = convMulFac ? atoi(convMulFac) : 1;
-            
-        signals[count].conversionDivFactor = convDivFac ? atoi(convDivFac) : 1;
                                                 
-        count++;
+        signalCount++;
     }
 
     free(line);
     fclose(file);
-    return count;
+    return signalCount;
 }
 
 int find_signal_index(const char *label, int signalCount, SignalConfig_t *signals) {
@@ -183,16 +261,65 @@ void black_on_cyan()
 
 /*===============================================*/
 
-void draw_screen()
+void draw_screen(uint8_t *visAcv, uint8_t *connAcv, int *romId)
 {
     clear();
     white_on_black();
-    move(0,28);
+    move(0,31);
     printw("Subaru ECU Utility");
     move(1,28);
-    printw("=======================");
-    move(24,1);
-    printw("Q:Quit L:Toggle Logging");
+    printw("========================");
+
+    
+    switch (*connAcv)
+    {
+        case 0: 
+            white_on_black(); 
+            move(19,36);
+            printw("No Connection");
+            break;
+        case 1: 
+            black_on_red();
+            if(0 != *romId){
+                move(0, 0);
+                printw("RomID = %08X", *romId);
+            }
+            black_on_green();
+            move(19,36);
+            printw("  Connected  "); 
+            break;
+        case 2: 
+            black_on_red();
+            move(19,33);
+            printw(" Connection Failed ");
+            move(23, 25);
+            printw("Press 'C' again to retry connecting!");
+            break;
+    }
+    
+        
+
+    switch (*visAcv)
+    {
+        case 0: white_on_black(); break;
+        case 1: black_on_green(); break;
+    }
+    move(20,35);
+    printw(" Visualization ");
+
+    switch (logmode)
+    {
+        case 0: white_on_black(); break;
+        case 1: black_on_green(); break;
+        case 2: black_on_red();   break;
+    }
+    move(21,38);
+    printw(" Logging ");
+
+
+    white_on_black();
+    move(25,1);
+    printw("Q:Quit\t\tC:Toggle Connection\tV: Toggle Visualisation\t\tL:Toggle Logging");
     refresh();
 }
 
@@ -378,7 +505,7 @@ void display_data(int signalCount, SignalConfig_t *signals ,int *measbuffer)
     printw("Injector Pulse Width");
 
     move(17,5);
-    bar(data/5);
+    bar((data)*100/65);
 
     move(17,26);
     white_on_black();
@@ -426,7 +553,7 @@ void display_data(int signalCount, SignalConfig_t *signals ,int *measbuffer)
     printw("Ignition Advance");
 
     move(8,47);
-    bar(data/2.55);
+    bar(data*100/255);
 
     move(8,68);
     white_on_black();
@@ -434,30 +561,7 @@ void display_data(int signalCount, SignalConfig_t *signals ,int *measbuffer)
   
     refresh();
 
-    /*-----------------------*/
-    /* Read Ignition Timing  */
-    /*-----------------------*/
-
-    currentIdx = find_signal_index("ignitionTiming", signalCount, signals);
-    if(currentIdx == -1){
-        data = 0;
-    }else{
-        data = measbuffer[currentIdx];
-    }
-    
-    move(10,49);
-    white_on_black();
-    printw("Ignition Advance");
-
-    move(11,47);
-    bar(data/2.55);
-
-    move(11,68);
-    white_on_black();
-    printw(" %3d degCrk ",data); 
-  
-    refresh();
-   
+      
     /*-----------------------*/
     /* Read Knock correction */
     /*-----------------------*/
@@ -469,12 +573,36 @@ void display_data(int signalCount, SignalConfig_t *signals ,int *measbuffer)
         data = measbuffer[currentIdx];
     }
     
-    move(13,49);
+    move(10,49);
     white_on_black();
     printw("Knock correction");
 
+    move(11,47);
+    bar(data*100/255);
+
+    move(11,68);
+    white_on_black();
+    printw(" %3d - ",data); 
+  
+    refresh();
+
+    /*-----------------------*/
+    /* Read Engine Load      */
+    /*-----------------------*/
+
+    currentIdx = find_signal_index("engineLoad", signalCount, signals);
+    if(currentIdx == -1){
+        data = 0;
+    }else{
+        data = measbuffer[currentIdx];
+    }
+    
+    move(13,49);
+    white_on_black();
+    printw("Engine Load");
+
     move(14,47);
-    bar(data/2.55);
+    bar(data*100/255);
 
     move(14,68);
     white_on_black();
@@ -482,8 +610,8 @@ void display_data(int signalCount, SignalConfig_t *signals ,int *measbuffer)
   
     refresh();
 
-       /*-----------------------*/
-    /* Read Knock correction */
+    /*-----------------------*/
+    /* Read Lambda correction*/
     /*-----------------------*/
 
     currentIdx = find_signal_index("AFCorrection", signalCount, signals);
@@ -498,34 +626,19 @@ void display_data(int signalCount, SignalConfig_t *signals ,int *measbuffer)
     printw("AFR correction");
 
     move(17,47);
-    bar((data+128)/100);
+    bar(((data*128)/100)+128);
 
     move(17,68);
     white_on_black();
-    printw(" %3d - ",data); 
+    printw(" %3d%% ",data); 
   
     refresh();
-
-     /*---------*/
-    /* Logmode */
-    /*---------*/
-
-    switch (logmode)
-    {
-        case 0: white_on_black(); break;
-        case 1: black_on_green(); break;
-        case 2: black_on_red();   break;
-    }
-
-    move(19,35);
-    printw(" Logging ");
-
 }
     
 void measure_data(int signalCount, SignalConfig_t *signals, int *measbuffer){
     
     uint8_t rawData = 0;
-    long elapsed_ms = 0;
+    uint32_t elapsed_ms = 0;
 
     for (int pollIdx = 0; pollIdx < signalCount; pollIdx++) {
         if (!signals[pollIdx].loggingEnabled) {
@@ -544,8 +657,8 @@ void measure_data(int signalCount, SignalConfig_t *signals, int *measbuffer){
         if (logmode == 1) {
             // Get time with milliseconds precision
             gettimeofday(&now, NULL);
-            elapsed_ms = (now.tv_sec - start.tv_sec) * 1000L +
-                         (now.tv_usec - start.tv_usec) / 1000L;
+            elapsed_ms = (now.tv_sec - start.tv_sec) * 1000U +
+                         (now.tv_usec - start.tv_usec) / 1000U;
 
             char logLine[MAX_OUTPUTLINELENGTH];
             char *p = logLine;
@@ -553,7 +666,7 @@ void measure_data(int signalCount, SignalConfig_t *signals, int *measbuffer){
             int written;
 
             // Write timestamp
-            written = snprintf(p, remaining, "%ld.%03ld", elapsed_ms / 1000L, elapsed_ms % 1000L);
+            written = snprintf(p, remaining, "%u.%03u", elapsed_ms / 1000U, elapsed_ms % 1000U);
             if (written < 0 || (size_t)written >= remaining) {
                 continue;
             }
@@ -584,6 +697,12 @@ void measure_data(int signalCount, SignalConfig_t *signals, int *measbuffer){
             // Write to log
             rc = fputs(logLine, logh);
             if (rc < 0) logmode = 2;
+
+            move(23, 25);
+            printw("Logging since %02d:%02d:%02d ", 
+                (elapsed_ms/3600000U), 
+                (elapsed_ms/60000U)%60,
+                (elapsed_ms/1000U)%60);
         }
     }
 }    
@@ -591,31 +710,59 @@ void measure_data(int signalCount, SignalConfig_t *signals, int *measbuffer){
  
 void build_logfile_header(int signalCount, const SignalConfig_t *signals, char logfileHeader[2][MAX_OUTPUTLINELENGTH]) {
 
-    logfileHeader[0][0] = '\0';  // labels line
-    logfileHeader[1][0] = '\0';  // units line
-    for (int i = 0; i < signalCount; i++) {
-        if (!signals[i].loggingEnabled)
+    const char *pLabel = NULL;
+    const char *pUnit = NULL;
+    uint8_t labelDone = 0;
+    uint8_t unitDone = 0; 
+    uint writeLabelCharIdx = 0;
+    uint writeUnitCharIdx = 0;
+    uint readCharIdx = 0;
+
+    for (int signalIdx = 0; signalIdx < signalCount; signalIdx++) {
+        if (0 == signals[signalIdx].loggingEnabled){
             continue;
+            // only write signals to header if they are to be logged
+        }
 
-        // Append label
-        strncat(logfileHeader[0], signals[i].label, MAX_OUTPUTLINELENGTH - strlen(logfileHeader[0]) - 1);
-        strncat(logfileHeader[0], ",", MAX_OUTPUTLINELENGTH - strlen(logfileHeader[0]) - 1);
+        pLabel = signals[signalIdx].label;
+        pUnit = signals[signalIdx].unit;
+        labelDone = 0; 
+        unitDone = 0;
+        readCharIdx = 0;
+        
+        while(writeLabelCharIdx < MAX_OUTPUTLINELENGTH - 2 || writeUnitCharIdx < MAX_OUTPUTLINELENGTH - 2){
+            
+            if(pLabel[readCharIdx] != '\0' && readCharIdx < MAX_LABELLENGTH){
+                logfileHeader[0][writeLabelCharIdx] = pLabel[readCharIdx];
+                writeLabelCharIdx++;
+            }else if(labelDone == 0){
+                logfileHeader[0][writeLabelCharIdx] = ',';
+                writeLabelCharIdx++;
+                labelDone = 1;
+            }
 
-        // Append unit
-        strncat(logfileHeader[1], signals[i].unit, MAX_OUTPUTLINELENGTH - strlen(logfileHeader[1]) - 1);
-        strncat(logfileHeader[1], ",", MAX_OUTPUTLINELENGTH - strlen(logfileHeader[1]) - 1);
+            if(pUnit[readCharIdx] != '\0' && readCharIdx < MAX_UNITLENGTH){
+                logfileHeader[1][writeUnitCharIdx] = pUnit[readCharIdx];
+                writeUnitCharIdx++;
+            }else if(unitDone == 0){
+                logfileHeader[1][writeUnitCharIdx] = ',';
+                writeUnitCharIdx++;
+                unitDone = 1;
+            }
+            
+            readCharIdx++;
+
+            if(unitDone && labelDone){
+                break;
+                // exit while loop if both are finished
+            }
+        }
     }
 
-    // Remove trailing commas
-    size_t len0 = strlen(logfileHeader[0]);
-    if (len0 > 0 && logfileHeader[0][len0 - 1] == ',') {
-        logfileHeader[0][len0 - 1] = '\0';
-    }
-
-    size_t len1 = strlen(logfileHeader[1]);
-    if (len1 > 0 && logfileHeader[1][len1 - 1] == ',') {
-        logfileHeader[1][len1 - 1] = '\0';
-    }
+    logfileHeader[0][writeLabelCharIdx - 1] = '\n';
+    logfileHeader[0][writeLabelCharIdx] = '\0';
+    logfileHeader[1][writeUnitCharIdx - 1] = '\n';
+    logfileHeader[1][writeUnitCharIdx] = '\0';
 }
 
 // Function to get the current timestamp as a formatted string
@@ -638,10 +785,15 @@ int main(int argc, char *argv[]){
     char logfile[256]="log/ecuscan.csv";
     char *configfile="config/signals.conf";
     int signalCount = 0;
-    char logfileHeader[2][MAX_OUTPUTLINELENGTH];
+    char logfileHeader[2][MAX_OUTPUTLINELENGTH] = {'\0'};
     SignalConfig_t signals[MAX_LABELCOUNT];
     int measBuffer[MAX_LABELCOUNT] = {0};
     char time_str[32];
+    int connectReq = 0;
+    int visualizeReq = 0; 
+    uint8_t connectionActive = 0;
+    uint8_t visualizeActive = 0;
+    int romId = 0x0;
 
 
     while ((opt = getopt (argc, argv, "d:")) != -1 )
@@ -666,61 +818,106 @@ int main(int argc, char *argv[]){
     
     mkdir("log", 0755);  // creates log/ if it doesn't exist (UNIX)
 
-    if ((rc=ssm_open(comport)) != 0)
-    {
-        printf("ssm_open() returned %d\n",rc);
-        perror("Error Details");
-        exit(1);
-    }
-
     initscr();
     curs_set(0);
     noecho();
     setup_colours();
-    nodelay(stdscr,TRUE);
+    nodelay(stdscr,FALSE);
 
     gettimeofday(&start,NULL);
 
-    // Get current time for logfile naming
-    get_time_string(time_str, sizeof(time_str), &start);
-
-    // Modify logfile name with the current time
-    snprintf(logfile, sizeof(logfile), "log/%s_ecuscan.csv", time_str);
-
     while((keypress & 0xDF) != 'Q')
-    {
-        measure_data(signalCount, signals, measBuffer);
+    {   
+        if(1 == connectionActive){
+            measure_data(signalCount, signals, measBuffer);
+        }
+
         getmaxyx(stdscr,height,width);
         if ((height < 25) || (width < 80))
         {
-            if (need_redraw == 0)
+            if (0 == need_redraw)
             {
                 clear();
-                need_redraw=1;
+                need_redraw = 1;
             }
             screen_too_small();
     	}
         else 
-        {
-            if (need_redraw == 1)
-            {
-                draw_screen();
-                need_redraw=0;
+        {   
+            if(connectReq && 1 != connectionActive){
+                if ((rc=ssm_open(comport)) != 0)
+                    {
+                        connectionActive = 2;
+                        connectReq = 0;
+                }else{
+                    connectionActive = 1;
+                    if(0 != ssm_romid_ecu(&romId)){
+                        romId = 0x0;
+                    }
+                    nodelay(stdscr, TRUE);
+                }
+                need_redraw=1;
             }
-            display_data(signalCount, signals, measBuffer);
+            if(!connectReq && 1 == connectionActive){
+                ssm_close();
+                connectionActive = 0;
+                logmode = 0;
+                nodelay(stdscr, FALSE);
+                need_redraw=1;
+            }
+            
+            if(visualizeReq && 1 == connectionActive){
+                display_data(signalCount, signals, measBuffer);
+                if(!visualizeActive){
+                    visualizeActive = 1;
+                    need_redraw=1;
+                }
+            }else{
+                if(1 == visualizeActive){
+                    visualizeActive = 0;
+                    need_redraw = 1;
+                }
+            }
+
+
+            if(1 == need_redraw){
+                draw_screen(&visualizeActive, &connectionActive, &romId);
+                need_redraw = 0;
+            }
+
         }
         keypress=getch();
-        if ((keypress & 0xDF) == 'L' && (logmode < 2)) logmode=(logmode+1) % 2;
 
-        if ((logmode==1) && (logh == NULL))
-        {   
+        if ((keypress & 0xDF) == 'L' && (logmode < 2)) {
+            logmode=(logmode+1) % 2;
+        }
+        if ((keypress & 0xDF) == 'V' && (visualizeReq < 2)) {
+            visualizeReq=(visualizeReq+1) % 2;
+        }
+        if ((keypress & 0xDF) == 'C' && (connectReq < 2)) {
+            connectReq=(connectReq+1) % 2;
+        }
+
+        if (connectionActive && (logmode==1) && (logh == NULL))
+        {       
+            // get current time again to start logging from 0
+            gettimeofday(&start,NULL);
+
+            // Get current time for logfile naming
+            get_time_string(time_str, sizeof(time_str), &start);
+
+            // Modify logfile name with the current time
+            snprintf(logfile, sizeof(logfile), "log/%s_%08X_ecuscan.csv", time_str, romId);
+
             logh=fopen(logfile,"a");
             if (logh == NULL) logmode=2;
-            
-            rc=fprintf(logh,"time,%s\ns,%s\n", logfileHeader[0], logfileHeader[1]);
-            //if (rc<0) logmode=2;
+            rc = fputs(logfileHeader[0], logh);
+            if (rc<0) logmode=2;
+            rc = fputs(logfileHeader[1], logh);
+            if (rc<0) logmode=2;
+            need_redraw = 1;
         }
-        if ((logmode==0) && (logh != NULL))
+        if ((0 == logmode) && (logh != NULL))
         {
             fclose(logh);
             logh=NULL;
