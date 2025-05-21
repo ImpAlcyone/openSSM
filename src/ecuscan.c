@@ -660,13 +660,15 @@ void measure_data(int signalCount, SignalConfig_t *signals, int *measbuffer){
             elapsed_ms = (now.tv_sec - start.tv_sec) * 1000U +
                          (now.tv_usec - start.tv_usec) / 1000U;
 
-            char logLine[MAX_OUTPUTLINELENGTH];
+            char logLine[MAX_OUTPUTLINELENGTH] = {'\0'};
             char *p = logLine;
             size_t remaining = sizeof(logLine);
             int written;
 
             // Write timestamp
-            written = snprintf(p, remaining, "%u.%03u", elapsed_ms / 1000U, elapsed_ms % 1000U);
+            written = snprintf(p, remaining, "%u.%03u", 
+                elapsed_ms / 1000U, 
+                elapsed_ms % 1000U);
             if (written < 0 || (size_t)written >= remaining) {
                 continue;
             }
@@ -685,7 +687,9 @@ void measure_data(int signalCount, SignalConfig_t *signals, int *measbuffer){
                 remaining -= written;
 
                 // Format value
-                written = snprintf(p, remaining, signals[logIdx].format, measbuffer[logIdx]);
+                written = snprintf(p, remaining,
+                     signals[logIdx].format,
+                      measbuffer[logIdx]);
                 if (written < 0 || (size_t)written >= remaining) break;
                 p += written;
                 remaining -= written;
@@ -712,20 +716,28 @@ void build_logfile_header(int signalCount, const SignalConfig_t *signals, char l
 
     const char *pLabel = NULL;
     const char *pUnit = NULL;
+    char *timeLabel = "time";
+    char *timeUnit = "s";
     uint8_t labelDone = 0;
     uint8_t unitDone = 0; 
     uint writeLabelCharIdx = 0;
     uint writeUnitCharIdx = 0;
     uint readCharIdx = 0;
 
-    for (int signalIdx = 0; signalIdx < signalCount; signalIdx++) {
-        if (0 == signals[signalIdx].loggingEnabled){
-            continue;
-            // only write signals to header if they are to be logged
-        }
 
-        pLabel = signals[signalIdx].label;
-        pUnit = signals[signalIdx].unit;
+    for (int signalIdx = -1; signalIdx < signalCount; signalIdx++) {
+       
+        if(-1 == signalIdx){
+            pLabel = timeLabel;
+            pUnit = timeUnit;
+        }else{
+            if (0 == signals[signalIdx].loggingEnabled){
+                continue;
+                // only write signals to header if they are to be logged
+            }
+            pLabel = signals[signalIdx].label;
+            pUnit = signals[signalIdx].unit;
+        }
         labelDone = 0; 
         unitDone = 0;
         readCharIdx = 0;
