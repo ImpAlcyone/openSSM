@@ -45,7 +45,7 @@ OBJS := $(patsubst $(SRC_DIR)/%.c,$(OBJ_DIR)/%.o,$(filter-out $(SRC_DIR)/tcuscan
 OBJS_CURSES := $(OBJ_DIR)/tcuscan.o $(OBJ_DIR)/ecuscan.o
 
 # Executables
-TARGETS := tcuscan ecuscan ecudump tcudump 4wsdump checkecu checktcu mapextract
+TARGETS := tcuscan ecuscan ecudump tcudump 4wsdump checkecu checktcu 
 ALL_TARGETS := $(addprefix $(BIN_DIR)/, $(TARGETS))
 
 # Default target
@@ -73,8 +73,6 @@ $(BIN_DIR)/checkecu: $(OBJ_DIR)/checkecu.o
 $(BIN_DIR)/checktcu: $(OBJ_DIR)/checktcu.o
 	$(CC) $^ -o $@
 
-$(BIN_DIR)/mapextract: $(OBJ_DIR)/mapextract.o
-	$(CC) $^ -o $@
 
 # Compile object files
 $(OBJ_DIR)/%.o: $(SRC_DIR)/%.c $(INC_DIR)/ssm.h
