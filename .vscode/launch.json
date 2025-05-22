@@ -15,7 +15,33 @@
             "setupCommands": [
                 { "description": "Enable pretty-printing", "text": "-enable-pretty-printing", "ignoreFailures": true }
             ]
+        },
+        {
+            "name": "Debug mapextract",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/bin/mapextract",
+            "args": ["-i", "../20250518_0x0-0xFFFF.bin",
+                     "-o", "../timingAdvancd.csv",
+                     "-m", "8900", 
+                     "-x", "84E0",
+                     "-y", "84D0",
+                     "-l", "16"
+                    ],  
+            "stopAtEntry": true,
+            "cwd": "${workspaceFolder}/bin",
+            "environment": [],
+            "externalConsole": false,  // maybe you want a real terminal here
+            "MIMode": "gdb",
+            "miDebuggerPath": "/usr/bin/gdb",
+            "setupCommands": [
+                {
+                "description": "Enable pretty-printing",
+                "text": "-enable-pretty-printing",
+                "ignoreFailures": true
+                }]
         }
     ],
+    
     "version": "2.0.0"
 }
