@@ -455,13 +455,13 @@ void display_data(int signalCount, SignalConfig_t *signals ,int *measbuffer)
     move(10,7);
     white_on_black();
     printw("Throttle Position");
-
+    int tpsV = ((data*255)*5)/255;
     move(11,5);
     bar(data);
 
     move(11,26);
     white_on_black();
-    printw(" %1d.%02dV (%3d%%)",data/100,data%100,data);
+    printw(" %1d.%02dV (%3d%%)",tpsV/100,tpsV%100,data);
 
     refresh();
 
