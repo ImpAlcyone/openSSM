@@ -744,7 +744,8 @@ void build_logfile_header(int signalCount, const SignalConfig_t *signals, char l
         
         while(writeLabelCharIdx < MAX_OUTPUTLINELENGTH - 2 || writeUnitCharIdx < MAX_OUTPUTLINELENGTH - 2){
             
-            if(pLabel[readCharIdx] != '\0' && readCharIdx < MAX_LABELLENGTH){
+            if(pLabel[readCharIdx] != '\0' && readCharIdx < MAX_LABELLENGTH &&
+               labelDone != 1){
                 logfileHeader[0][writeLabelCharIdx] = pLabel[readCharIdx];
                 writeLabelCharIdx++;
             }else if(labelDone == 0){
@@ -753,7 +754,8 @@ void build_logfile_header(int signalCount, const SignalConfig_t *signals, char l
                 labelDone = 1;
             }
 
-            if(pUnit[readCharIdx] != '\0' && readCharIdx < MAX_UNITLENGTH){
+            if(pUnit[readCharIdx] != '\0' && readCharIdx < MAX_UNITLENGTH &&
+               unitDone != 1){
                 logfileHeader[1][writeUnitCharIdx] = pUnit[readCharIdx];
                 writeUnitCharIdx++;
             }else if(unitDone == 0){
@@ -865,6 +867,8 @@ int main(int argc, char *argv[]){
                     connectionActive = 1;
                     if(0 != ssm_romid_ecu(&romId)){
                         romId = 0x0;
+                        connectionActive = 2;
+                        connectReq = 0;
                     }
                     nodelay(stdscr, TRUE);
                 }
@@ -910,7 +914,7 @@ int main(int argc, char *argv[]){
             connectReq=(connectReq+1) % 2;
         }
 
-        if (connectionActive && (logmode==1) && (logh == NULL))
+        if (1 == connectionActive && (logmode==1) && (logh == NULL))
         {       
             // get current time again to start logging from 0
             gettimeofday(&start,NULL);
