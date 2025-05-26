@@ -1,6 +1,0 @@
-time,throttlePosition,engineSpeed,engineLoad,knockCorrection,injectorPulseWidth,ISUDutyValve,vehicleSpeed,coolantTemp
-s,%,rpm,%,-,ms,%,km/h,degC
-time,throttlePosition,engineSpeed,engineLoad,knockCorrection,injectorPulseWidth,ISUDutyValve,vehicleSpeed,coolantTemp
-s,%,rpm,%,-,ms,%,km/h,degC
-time,throttlePosition,engineSpeed,engineLoad,knockCorrection,injectorPulseWidth,ISUDutyValve,vehicleSpeed,coolantTemp
-s,%,rpm,%,-,ms,%,km/h,degC
