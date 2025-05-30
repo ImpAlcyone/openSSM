@@ -1,3 +1,9 @@
-./bin/log
-./src/obj
-./log
+# Ignore build output and logs
+bin/log/
+src/obj/
+log/
+
+# Optional: ignore all bin/* except bin/config/
+bin/*
+!bin/config/
+!bin/config/signals.conf
