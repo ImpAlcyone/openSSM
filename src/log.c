@@ -28,7 +28,12 @@ void set_current_time(struct timeval *now)
     _now = *now;
 }
 
-void build_logfile_header(int signalCount, const SignalConfig_t *signals) 
+void set_logmode(int ext_logmode)
+{
+    logmode = ext_logmode;
+}
+
+void build_logfile_header(const SignalConfig_t *signals, int signalCount)
 {
 
     const char *pLabel = NULL;
@@ -96,7 +101,7 @@ void build_logfile_header(int signalCount, const SignalConfig_t *signals)
     logfileHeader[1][writeUnitCharIdx] = '\0';
 }
 
-int open_logfile(int romId)
+int open_logfile(char *logfile_name, int romId)
 { 
     char time_str[32];  
     int rc = 0;    
@@ -116,6 +121,7 @@ int open_logfile(int romId)
     rc = fputs(logfileHeader[1], logfile);
     if (rc<0) logmode=2;
 
+    return logmode;
 }
 
 void write_log_line(int signalCount, SignalConfig_t *signals, int *measbuffer)
@@ -174,8 +180,10 @@ void write_log_line(int signalCount, SignalConfig_t *signals, int *measbuffer)
         
 void close_logfile(void)
 {
-    fclose(logfile);
-    logfile=NULL;
+    if(logfile != NULL){
+        fclose(logfile);
+        logfile=NULL;
+    }
 }
 
 static void get_time_string(char *time_str, size_t max_len, struct timeval *_start)

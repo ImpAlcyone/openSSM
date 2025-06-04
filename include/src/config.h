@@ -1,6 +1,10 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 // defines
 #define MAX_LABELCOUNT 32
 #define MAX_LABELLENGTH 128
@@ -29,5 +33,9 @@ typedef struct {
 int load_signal_config(const char *filename, SignalConfig_t *signals);
 int find_signal_index(const char *label, SignalConfig_t *signals, int signalCount);
 
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

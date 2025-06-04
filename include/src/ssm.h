@@ -23,6 +23,12 @@
 //  Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 //
 
+#ifndef SSM_H
+#define SSM_H
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /*=====================================================================*/
 /* ALL OF THESE FUNCTIONS RETURN ZERO ON SUCCESS AND NON-ZERO ON ERROR */
@@ -93,3 +99,8 @@ int ssm_romid_ecu(int *romid);
 int ssm_romid_tcu(int *romid);
 int ssm_romid_4ws(int *romid);
 
+#ifdef __cplusplus
+}
+#endif
+
+#endif
