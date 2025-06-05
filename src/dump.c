@@ -33,11 +33,6 @@ static int open_output_file(char *outfile)
     }
 }
 
-void set_romfile_name(char *ext_romfileName)
-{
-    romfileName = ext_romfileName;
-}
-
 /*-----------------------------*/
 /* Prepare for dumping ECU ROM */
 /*-----------------------------*/
@@ -97,6 +92,11 @@ static void end(void)
 {
 	ssm_close();
 	fclose(romfile);
+}
+
+void set_romfile_name(char *ext_romfileName)
+{
+    romfileName = ext_romfileName;
 }
 
 /*---------------------------------------------------*/
@@ -160,7 +160,7 @@ int poll_and_write(uint8_t *data, int start, int end, int *romid)
 	}
 	printf("\n");
 
-    end();
+    end;
     
     return 0;
 }
