@@ -2,6 +2,7 @@
 
 #include "config.h"
 #include "measure.h"
+#include "ssm.h"
 
 
 void measure_data(SignalConfig_t *signals, int *measbuffer, int signalCount)
