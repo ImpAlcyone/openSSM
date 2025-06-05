@@ -1,8 +1,8 @@
 # Ignore build output and logs
 bin/log/
 src/obj/
-src/archive/
 log/
+build/
 
 # Optional: ignore all bin/* except bin/config/
 bin/*
