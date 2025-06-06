@@ -38,4 +38,4 @@ int find_signal_index(const char *label, SignalConfig_t *signals, int signalCoun
 }
 #endif
 
-#endif
+#endif // CONFIG_H
