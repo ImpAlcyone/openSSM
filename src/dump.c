@@ -6,10 +6,10 @@
 
 #include "ssm.h"
 
-int rc = 0;
-char *comport = "/dev/ttyUSB0";
-char *romfileName = "rom.bin";
-FILE *romfile = NULL;
+static int rc = 0;
+static char *comport = "/dev/ttyUSB0";
+static char *romfileName = "rom.bin";
+static FILE *romfile = NULL;
 
 /*---------------------------------*/
 /* convert string to address value */

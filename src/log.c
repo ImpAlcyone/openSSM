@@ -11,12 +11,12 @@
 #include "log.h"
 
 
-FILE *logfile = NULL;
-char logfileName[MAX_FILENAME_LENGTH] = {'\0'};
-char logfileHeader[2][MAX_OUTPUTLINELENGTH] = {'\0'};
-int logmode = 0;
-struct timeval _start;
-struct timeval _now;
+static FILE *logfile = NULL;
+static char logfileName[MAX_FILENAME_LENGTH] = {'\0'};
+static char logfileHeader[2][MAX_OUTPUTLINELENGTH] = {'\0'};
+static int logmode = 0;
+static struct timeval _start;
+static struct timeval _now;
 
 static void get_time_string(char *time_str, size_t max_len, struct timeval *_start);
 
