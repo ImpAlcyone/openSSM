@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <string.h>
 #include <sys/stat.h>
 #include <sys/time.h>
 #include <time.h>
@@ -11,12 +12,18 @@
 
 
 FILE *logfile = NULL;
+char logfileName[MAX_FILENAME_LENGTH] = {'\0'};
 char logfileHeader[2][MAX_OUTPUTLINELENGTH] = {'\0'};
 int logmode = 0;
 struct timeval _start;
 struct timeval _now;
 
 static void get_time_string(char *time_str, size_t max_len, struct timeval *_start);
+
+static inline int min_int(int a, int b)
+{
+    return (a < b) ? a : b;
+}
 
 void set_start_time(struct timeval *start)
 {
@@ -31,6 +38,13 @@ void set_current_time(struct timeval *now)
 void set_logmode(int ext_logmode)
 {
     logmode = ext_logmode;
+}
+
+void set_logfile_name(char *ext_logfileName)
+{
+    int size = 0;
+    size = min_int((int)strlen(ext_logfileName), (int)MAX_FILENAME_LENGTH);
+    memcpy(logfileName, ext_logfileName, size);
 }
 
 void build_logfile_header(const SignalConfig_t *signals, int signalCount)
@@ -101,20 +115,24 @@ void build_logfile_header(const SignalConfig_t *signals, int signalCount)
     logfileHeader[1][writeUnitCharIdx] = '\0';
 }
 
-int open_logfile(char *logfile_name, int romId)
+int open_logfile(int romId)
 { 
-    char time_str[32];  
+    char time_str[32];
     int rc = 0;    
-    // get current time again to _start logging from 0
-    gettimeofday(&_start,NULL);
 
-    // Get current time for logfile naming
-    get_time_string(time_str, sizeof(time_str), &_start);
+    if(logfileName[0] == '\0')
+    {
+        // get current time again to _start logging from 0
+        gettimeofday(&_start,NULL);
 
-    // Modify logfile name with the current time
-    snprintf(logfile, sizeof(logfile), "log/%s_%08X_ecuscan.csv", time_str, romId);
+        // Get current time for logfile naming
+        get_time_string(time_str, sizeof(time_str), &_start);
 
-    logfile=fopen(logfile,"a");
+        // Modify logfile name with the current time
+        snprintf(logfileName, sizeof(logfile), "log/%s_%08X_ecuscan.csv", time_str, romId);
+    }
+
+    logfile=fopen(logfileName,"w");
     if (logfile == NULL) logmode=2;
     rc = fputs(logfileHeader[0], logfile);
     if (rc<0) logmode=2;
