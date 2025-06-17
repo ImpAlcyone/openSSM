@@ -1,3 +1,5 @@
+# main CMakeLists.txt
+
 cmake_minimum_required(VERSION 3.14)
 project(Subaru_ECU_util C)
 
@@ -16,6 +18,7 @@ include_directories(
 # Add subdirectories
 add_subdirectory(src)
 add_subdirectory(ui)
+add_subdirectory(tests)
 
 # Main executable (depends on needed shared libs)
 add_executable(Subaru_ECU_util main.c)
@@ -28,8 +31,6 @@ target_link_libraries(Subaru_ECU_util
     log
     measure
     ssm
-    dump_ui
-    error_ui
-    main_ui
-    measure_ui
+    ui
+    ncurses
 )
