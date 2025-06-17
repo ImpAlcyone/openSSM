@@ -1,6 +1,9 @@
 #ifndef LOG_H
 #define LOG_H
 
+#include <sys/time.h>
+#include <time.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
