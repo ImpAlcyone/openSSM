@@ -1,22 +1,28 @@
 #include <ncurses.h>
 #include <stdint.h>
+#include <string.h>
 
+#include "ssm.h"
 #include "plot.h"
 #include "measure.h"
 #include "config.h"
 #include "config_ui.h"
 #include "log.h"
 
-static const char *config_file = "config/signals.conf";
 static int x_max, y_max;
 static int init_state = 1;
 static int signal_count = 0;
+static int romId = 0x0;
 static int vis_mode = 0;
 static int conn_mode = 0;
 static int log_mode = 0;
+static int vis_req = 0;
+static int conn_req = 0;
+static int log_req = 0;
+static int redraw = 0;
 static SignalConfig_t signals[MAX_LABELCOUNT]; 
 
-static int init_measure_ui(void)
+static int init_measure_ui(char *config_file)
 {
     x_max = 0;
     y_max = 0;
@@ -35,47 +41,55 @@ static int init_measure_ui(void)
 
 
 /* Draw basic measurement screen*/
- static void draw_screen(int *romId)
+static void draw_screen(void)
 {
+    getmaxyx(stdscr, y_max, x_max); // Get the number of rows and columns
+    int y_mid = y_max >> 1;
+    int x_mid = x_max >> 1;
+    char *conn_messages[] = {
+        "No Connection",
+        "Connected",
+        "Connecting Failed"};
+    char *conn_error [] = {
+        "Press 'C' again to retry connecting!"};
+    char *vis_messages[] = {
+        "Visualization off",
+        "Visualization on"};
+    char *log_messages[] = {
+        "Logging off",
+        "Logging on",
+        "Logging Failed"};
     clear();
     white_on_black();
-
     
     switch (conn_mode)
     {
-        case 0: 
-            white_on_black(); 
-            move(19,36);
-            printw("No Connection");
-            break;
-        case 1: 
-            black_on_red();
-            if(0 != *romId){
-                move(0, 0);
-                printw("RomID = %08X", *romId);
+        case 0: white_on_black(); break;
+        case 1: black_on_red();
+            if(0 != romId){
+                move(1, 0);
+                printw("RomID = %06X", romId);
             }
             black_on_green();
-            move(19,36);
-            printw("  Connected  "); 
             break;
-        case 2: 
-            black_on_red();
-            move(19,33);
-            printw(" Connection Failed ");
-            move(23, 25);
-            printw("Press 'C' again to retry connecting!");
+        case 2: black_on_red();
+            mvprintw(y_max - 2,
+            x_mid - ((int)strlen(conn_error[0]) >> 1),
+            conn_error[0]); 
             break;
     }
+    mvprintw(y_max - 6,
+            x_mid - ((int)strlen(conn_messages[conn_mode]) >> 1),
+            conn_messages[conn_mode]); 
     
-        
-
     switch (vis_mode)
     {
         case 0: white_on_black(); break;
         case 1: black_on_green(); break;
     }
-    move(20,35);
-    printw(" Visualization ");
+    mvprintw(y_max - 5,
+            x_mid - ((int)strlen(vis_messages[vis_mode]) >> 1),
+            vis_messages[vis_mode]);
 
     switch (log_mode)
     {
@@ -83,22 +97,107 @@ static int init_measure_ui(void)
         case 1: black_on_green(); break;
         case 2: black_on_red();   break;
     }
-    move(21,38);
-    printw(" Logging ");
-
+     mvprintw(y_max - 4,
+        x_mid - ((int)strlen(log_messages[log_mode]) >> 1),
+        log_messages[log_mode]);
 
     white_on_black();
+    
     move(25,1);
     printw("Q:Quit\t\tC:Toggle Connection\tV: Toggle Visualisation\t\tL:Toggle Logging");
     refresh();
+    redraw = 0;
 }
 
-void run_measure_tab(void) 
+static void connect_ecu(char *comport)
+{
+    if(conn_req && conn_mode != 1){
+        if ((ssm_open(comport)) != 0)
+        {
+            conn_mode = 2;
+            conn_req = 0;
+        }
+        else
+        {
+            conn_mode = 1;
+            if(ssm_romid_ecu(&romId) != 0)
+            {
+                romId = 0x0;
+                conn_mode = 2;
+                conn_req = 0;
+            }
+        }
+    }
+    if(!conn_req && 1 == conn_mode)
+    {
+        ssm_close();
+        conn_mode = 0;
+        log_mode = 0;
+    }
+}
+
+static void log_ecu(char *log_file)
+{
+    switch (log_req)
+    {
+        case 0:
+            if(get_log_file != NULL)
+            {
+                log_mode = close_logfile();
+            }            
+            break;
+        case 1:
+            if (1 == conn_mode && (1 == log_req) && (get_log_file == NULL))
+            {
+                if(log_file[0] != '\0' && get_logfileName_state())
+                {
+                    set_logfile_name(log_file);
+                }
+
+                log_mode = open_logfile(romId);
+            }
+            break;        
+        default:
+            break;
+    }
+   
+}
+
+void run_measure_tab(ui_config_t *p_ui_config) 
 {
     if(init_state)
     {
-        init_state = init_measure_ui();
+        init_state = init_measure_ui(p_ui_config->config_file);
     }
-   getmaxyx(stdscr, y_max, x_max); // Get the number of rows and columns
+    
+    if(redraw){draw_screen();};
+}
+
+void user_input_measure(int *keypress, ui_config_t *p_ui_config)
+{   
+    if(init_state) {return;}; 
+    redraw = 1;
+    int _keypress = *keypress & 0xDF;
+    switch (_keypress)
+    {
+    case 'C':
+        conn_req = (conn_req + 1) % 2;
+        connect_ecu(p_ui_config->comport);
+        break;
+    case 'V':
+        vis_req = (vis_req + 1) % 2;        
+        break;
+    case 'L':
+        if(log_mode < 2)
+        {
+            log_req = (log_req + 1) % 2;
+            log_ecu(p_ui_config->log_file);
+        }
+        break;
+    
+    default:
+        redraw = 0;
+        break;
+    }
 }
 

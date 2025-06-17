@@ -14,7 +14,8 @@
 static FILE *logfile = NULL;
 static char logfileName[MAX_FILENAME_LENGTH] = {'\0'};
 static char logfileHeader[2][MAX_OUTPUTLINELENGTH] = {'\0'};
-static int logmode = 0;
+static int _logmode = 0;
+static int logfileName_is_set = 0;
 static struct timeval _start;
 static struct timeval _now;
 
@@ -37,7 +38,17 @@ void set_current_time(struct timeval *now)
 
 void set_logmode(int ext_logmode)
 {
-    logmode = ext_logmode;
+    _logmode = ext_logmode;
+}
+
+int get_logfileName_state(void)
+{
+    return logfileName_is_set;
+}
+
+FILE * get_log_file(void)
+{
+    return logfile;
 }
 
 void set_logfile_name(char *ext_logfileName)
@@ -45,6 +56,7 @@ void set_logfile_name(char *ext_logfileName)
     int size = 0;
     size = min_int((int)strlen(ext_logfileName), (int)MAX_FILENAME_LENGTH);
     memcpy(logfileName, ext_logfileName, size);
+    logfileName_is_set = 1;
 }
 
 void build_logfile_header(const SignalConfig_t *signals, int signalCount)
@@ -129,20 +141,20 @@ int open_logfile(int romId)
         get_time_string(time_str, sizeof(time_str), &_start);
 
         // Modify logfile name with the current time
-        snprintf(logfileName, sizeof(logfile), "log/%s_%08X_ecuscan.csv", time_str, romId);
+        snprintf(logfileName, sizeof(logfile), "log/%s_%06X_ecuscan.csv", time_str, romId);
     }
 
     logfile=fopen(logfileName,"w");
-    if (logfile == NULL) logmode=2;
+    if (logfile == NULL) _logmode=2;
     rc = fputs(logfileHeader[0], logfile);
-    if (rc<0) logmode=2;
+    if (rc<0) _logmode=2;
     rc = fputs(logfileHeader[1], logfile);
-    if (rc<0) logmode=2;
+    if (rc<0) _logmode=2;
 
-    return logmode;
+    return _logmode;
 }
 
-void write_log_line(int signalCount, SignalConfig_t *signals, int *measbuffer)
+void write_log_line(int signalCount, SignalConfig_t *signals, int *measbuffer_)
 {
     uint32_t elapsed_ms = 0;
     int rc = 0;
@@ -161,7 +173,8 @@ void write_log_line(int signalCount, SignalConfig_t *signals, int *measbuffer)
     written = snprintf(p, remaining, "%u.%03u", 
         elapsed_ms / 1000U, 
         elapsed_ms % 1000U);
-    if (written < 0 || (size_t)written >= remaining) {
+    if (written < 0 || (size_t)written >= remaining) 
+    {
         return;
     }
     p += written;
@@ -196,12 +209,14 @@ void write_log_line(int signalCount, SignalConfig_t *signals, int *measbuffer)
 
 }
         
-void close_logfile(void)
+int close_logfile(void)
 {
     if(logfile != NULL){
         fclose(logfile);
         logfile=NULL;
+        _logmode = 0;
     }
+    return _logmode;
 }
 
 static void get_time_string(char *time_str, size_t max_len, struct timeval *_start)

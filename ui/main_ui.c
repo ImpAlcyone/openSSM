@@ -4,6 +4,7 @@
 #include <stdarg.h>
 #include <ncurses.h>
 
+#include "config_ui.h"
 #include "dump_ui.h"
 #include "error_ui.h"
 #include "measure_ui.h"
@@ -48,7 +49,25 @@ static int tab_cleanup(void)
     }
 }
 
-int run_main_ui(void)
+static int process_user_input(int *keypress, ui_config_t *p_ui_config)
+{
+    switch (active_tab)
+    {
+        case 0:
+            /* code */
+            break;
+        case 1:
+            /* code */
+            break;
+        case 2: // measure_ui
+            user_input_measure(keypress, p_ui_config);
+            break;
+        default:
+            break;
+    }
+}
+
+int run_main_ui(ui_config_t *p_ui_config)
 {
     int keypress = 0;
     initscr();
@@ -72,7 +91,7 @@ int run_main_ui(void)
         {
             case 0: draw_dump_tab(); break;
             case 1: draw_error_tab(); break;
-            case 2: run_measure_tab(); break;
+            case 2: run_measure_tab(p_ui_config); break;
         }
 
         refresh();
@@ -89,6 +108,10 @@ int run_main_ui(void)
         else if(keypress == 'q') 
         {
             break;
+        }
+        else
+        {
+            process_user_input(&keypress, p_ui_config);
         }
     }
 

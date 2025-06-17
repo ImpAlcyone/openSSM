@@ -7,6 +7,17 @@
 extern "C" {
 #endif
 
+/* defines */
+#define MAX_FILEPATH_LENGTH 0xFFF
+
+/* structs */
+typedef struct
+{
+    char config_file[MAX_FILEPATH_LENGTH];
+    char log_file[MAX_FILEPATH_LENGTH];
+    char comport[MAX_FILEPATH_LENGTH];
+} ui_config_t;
+
 /* functions */
 
 void setup_colours(void);
