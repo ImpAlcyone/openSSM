@@ -154,7 +154,7 @@ int open_logfile(int romId)
     return _logmode;
 }
 
-void write_log_line(int signalCount, SignalConfig_t *signals, int *measbuffer_)
+int write_log_line(int signalCount, SignalConfig_t *signals, int *measbuffer)
 {
     uint32_t elapsed_ms = 0;
     int rc = 0;
@@ -205,8 +205,8 @@ void write_log_line(int signalCount, SignalConfig_t *signals, int *measbuffer_)
 
     // Write to log
     rc = fputs(logLine, logfile);
-    if (rc < 0) logmode = 2;
-
+    if (rc < 0) _logmode = 2;
+    return _logmode;
 }
         
 int close_logfile(void)

@@ -20,7 +20,7 @@ int get_logfileName_state(void);
 FILE * get_log_file(void);
 void build_logfile_header(const SignalConfig_t *signals, int signalCount);
 int open_logfile(int romId);
-void write_log_line(int signalCount, SignalConfig_t *signals, int *measbuffer);
+int write_log_line(int signalCount, SignalConfig_t *signals, int *measbuffer);
 int close_logfile(void);
 
 #ifdef __cplusplus

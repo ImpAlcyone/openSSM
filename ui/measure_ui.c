@@ -153,7 +153,6 @@ static void log_ecu(char *log_file)
                 {
                     set_logfile_name(log_file);
                 }
-
                 log_mode = open_logfile(romId);
             }
             break;        
@@ -183,18 +182,20 @@ void user_input_measure(int *keypress, ui_config_t *p_ui_config)
     case 'C':
         conn_req = (conn_req + 1) % 2;
         connect_ecu(p_ui_config->comport);
+        redraw = 1;
         break;
     case 'V':
-        vis_req = (vis_req + 1) % 2;        
+        vis_req = (vis_req + 1) % 2;    
+        redraw = 1;    
         break;
     case 'L':
         if(log_mode < 2)
         {
             log_req = (log_req + 1) % 2;
             log_ecu(p_ui_config->log_file);
+            redraw = 1;
         }
-        break;
-    
+        break;    
     default:
         redraw = 0;
         break;
