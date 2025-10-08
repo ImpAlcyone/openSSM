@@ -68,14 +68,14 @@ typedef struct {
 } SignalConfig_t;
 
 int load_signal_config(const char *filename, SignalConfig_t *signals, int max_label_count) {
-    
+
     FILE *file = fopen(filename, "r");
     if (!file) {
         perror("Failed to open signal config file");
         return -1;
     }
 
-    
+
     char *line = NULL;
     size_t len = 0;
     ssize_t readCharCount;
@@ -97,11 +97,11 @@ int load_signal_config(const char *filename, SignalConfig_t *signals, int max_la
 
 
     while ((readCharCount = getline(&line, &len, file)) != -1 && signalCount < max_label_count) {
-        
+
         // Skip header or comments
         if (line[0] == '#') continue;
 
-        // reset 
+        // reset
         loggingEnabled = '\0';
         memset(label, '\0', sizeof(label));
         memset(unit, '\0', sizeof(unit));
@@ -135,7 +135,7 @@ int load_signal_config(const char *filename, SignalConfig_t *signals, int max_la
                         pCurrentWriteChar = &loggingEnabled;
                         max_field_charCount = 1;
                         break;
-                    
+
                     case 1:
                         pCurrentWriteChar = label;
                         max_field_charCount = MAX_LABELLENGTH;
@@ -201,7 +201,7 @@ int load_signal_config(const char *filename, SignalConfig_t *signals, int max_la
         signals[signalCount].conversionMulFactor = atoi(convMulFac);
         signals[signalCount].conversionDivFactor = atoi(convDivFac);
 
-                                                
+
         signalCount++;
     }
 
@@ -270,15 +270,15 @@ void draw_screen(uint8_t *visAcv, uint8_t *connAcv, int *romId)
     move(1,28);
     printw("========================");
 
-    
+
     switch (*connAcv)
     {
-        case 0: 
-            white_on_black(); 
+        case 0:
+            white_on_black();
             move(19,36);
             printw("No Connection");
             break;
-        case 1: 
+        case 1:
             black_on_red();
             if(0 != *romId){
                 move(0, 0);
@@ -286,9 +286,9 @@ void draw_screen(uint8_t *visAcv, uint8_t *connAcv, int *romId)
             }
             black_on_green();
             move(19,36);
-            printw("  Connected  "); 
+            printw("  Connected  ");
             break;
-        case 2: 
+        case 2:
             black_on_red();
             move(19,33);
             printw(" Connection Failed ");
@@ -296,8 +296,8 @@ void draw_screen(uint8_t *visAcv, uint8_t *connAcv, int *romId)
             printw("Press 'C' again to retry connecting!");
             break;
     }
-    
-        
+
+
 
     switch (*visAcv)
     {
@@ -354,7 +354,7 @@ void absbar(int value, int min, int max){
     }else{
         black_on_green();
     }
-        if (value < 130) 
+        if (value < 130)
             black_on_green();
 
     percent=((value+min)*100)/(min+max);
@@ -373,9 +373,9 @@ void Tempbar(int tempC)
     if (tempC < 50)
         black_on_cyan();
     else
-        if (tempC < 130) 
+        if (tempC < 130)
             black_on_green();
-        else 
+        else
             black_on_red();
 
     percent=((tempC+50)*100)/255;
@@ -390,31 +390,31 @@ void display_data(int signalCount, SignalConfig_t *signals ,int *measbuffer)
 {
     int data;
     int currentIdx = -1;
-    
-   
+
+
     /*----------*/
-    /* Read KMH */
+    /* Read Load */
     /*----------*/
-    
-    currentIdx = find_signal_index("vehicleSpeed", signalCount, signals);
+
+    currentIdx = find_signal_index("engineLoad", signalCount, signals);
     if(currentIdx == -1){
         data = 0;
     }else{
         data = measbuffer[currentIdx];
     }
 
-   
+
     move(4,8);
     white_on_black();
-    printw("Vehicle Speed");
+    printw("Engine Load");
 
     move(5,5);
-    bar((data*100)/180);
+    bar((data*100)/255);
 
     move(5,26);
     white_on_black();
-    printw("%3d km/h ",data);
-   
+    printw("%3d - ",data);
+
     refresh();
 
     /*----------*/
@@ -427,7 +427,7 @@ void display_data(int signalCount, SignalConfig_t *signals ,int *measbuffer)
     }else{
         data = measbuffer[currentIdx];
     }
-   
+
     move(7,8);
     white_on_black();
     printw("Engine Speed");
@@ -438,7 +438,7 @@ void display_data(int signalCount, SignalConfig_t *signals ,int *measbuffer)
     move(8,26);
     white_on_black();
     printw(" %4d rpm",data);
-   
+
     refresh();
 
     /*----------*/
@@ -451,7 +451,7 @@ void display_data(int signalCount, SignalConfig_t *signals ,int *measbuffer)
     }else{
         data = measbuffer[currentIdx];
     }
-    
+
     move(10,7);
     white_on_black();
     printw("Throttle Position");
@@ -475,7 +475,7 @@ void display_data(int signalCount, SignalConfig_t *signals ,int *measbuffer)
     }else{
         data = measbuffer[currentIdx];
     }
-     
+
     move(13,8);
     white_on_black();
     printw("Idle Valve Duty");
@@ -486,7 +486,7 @@ void display_data(int signalCount, SignalConfig_t *signals ,int *measbuffer)
     move(14,26);
     white_on_black();
     printw(" %3d%% ",data);
-   
+
     refresh();
 
     /*---------------------------*/
@@ -514,26 +514,26 @@ void display_data(int signalCount, SignalConfig_t *signals ,int *measbuffer)
     refresh();
 
     /*-----------*/
-    /* Read Temp */
+    /* Read base ignition timing */
     /*-----------*/
 
-    currentIdx = find_signal_index("coolantTemp", signalCount, signals);
+    currentIdx = find_signal_index("ignitionTimingBas", signalCount, signals);
     if(currentIdx == -1){
         data = 0;
     }else{
         data = measbuffer[currentIdx];
     }
-   
+
     move(4,47);
     white_on_black();
-    printw("Coolant Temperature");
+    printw("Base Timing");
 
     move(5,47);
-    Tempbar(data);
+    bar(data*100/255);
 
     move(5,68);
     white_on_black();
-    if (celsius) printw(" %3d C ",data);
+    printw(" %3d degCrk ",data);
 
     refresh();
 
@@ -541,27 +541,27 @@ void display_data(int signalCount, SignalConfig_t *signals ,int *measbuffer)
     /* Read Ignition advance */
     /*-----------------------*/
 
-    currentIdx = find_signal_index("ignitionAdvance", signalCount, signals);
+    currentIdx = find_signal_index("ignitionTimingAdv", signalCount, signals);
     if(currentIdx == -1){
         data = 0;
     }else{
         data = measbuffer[currentIdx];
     }
-    
+
     move(7,49);
     white_on_black();
-    printw("Ignition Advance");
+    printw("Ignition Timing advance");
 
     move(8,47);
     bar(data*100/255);
 
     move(8,68);
     white_on_black();
-    printw(" %3d degCrk ",data); 
-  
+    printw(" %3d - ",data);
+
     refresh();
 
-      
+
     /*-----------------------*/
     /* Read Knock correction */
     /*-----------------------*/
@@ -572,42 +572,42 @@ void display_data(int signalCount, SignalConfig_t *signals ,int *measbuffer)
     }else{
         data = measbuffer[currentIdx];
     }
-    
+
     move(10,49);
     white_on_black();
     printw("Knock correction");
 
     move(11,47);
-    bar(data*100/255);
+    bar((data + 100) / 200);
 
     move(11,68);
     white_on_black();
-    printw(" %3d - ",data); 
-  
+    printw(" %3d % ",data);
+
     refresh();
 
     /*-----------------------*/
-    /* Read Engine Load      */
+    /* Read final timing      */
     /*-----------------------*/
 
-    currentIdx = find_signal_index("engineLoad", signalCount, signals);
+    currentIdx = find_signal_index("ignitionTimingFnl", signalCount, signals);
     if(currentIdx == -1){
         data = 0;
     }else{
         data = measbuffer[currentIdx];
     }
-    
+
     move(13,49);
     white_on_black();
-    printw("Engine Load");
+    printw("Final Ignition Timing");
 
     move(14,47);
     bar(data*100/255);
 
     move(14,68);
     white_on_black();
-    printw(" %3d - ",data); 
-  
+    printw(" %3d - ",data);
+
     refresh();
 
     /*-----------------------*/
@@ -620,7 +620,7 @@ void display_data(int signalCount, SignalConfig_t *signals ,int *measbuffer)
     }else{
         data = measbuffer[currentIdx];
     }
-    
+
     move(16,49);
     white_on_black();
     printw("AFR correction");
@@ -630,13 +630,13 @@ void display_data(int signalCount, SignalConfig_t *signals ,int *measbuffer)
 
     move(17,68);
     white_on_black();
-    printw(" %3d%% ",data); 
-  
+    printw(" %3d%% ",data);
+
     refresh();
 }
-    
+
 void measure_data(int signalCount, SignalConfig_t *signals, int *measbuffer){
-    
+
     uint8_t rawData = 0;
     uint32_t elapsed_ms = 0;
 
@@ -650,8 +650,8 @@ void measure_data(int signalCount, SignalConfig_t *signals, int *measbuffer){
         }
 
         // Update the buffer for this signal only
-        measbuffer[pollIdx] = ((rawData + signals[pollIdx].conversionOffset) * 
-                               signals[pollIdx].conversionMulFactor) / 
+        measbuffer[pollIdx] = ((rawData + signals[pollIdx].conversionOffset) *
+                               signals[pollIdx].conversionMulFactor) /
                                signals[pollIdx].conversionDivFactor;
 
         if (logmode == 1) {
@@ -666,8 +666,8 @@ void measure_data(int signalCount, SignalConfig_t *signals, int *measbuffer){
             int written;
 
             // Write timestamp
-            written = snprintf(p, remaining, "%u.%03u", 
-                elapsed_ms / 1000U, 
+            written = snprintf(p, remaining, "%u.%03u",
+                elapsed_ms / 1000U,
                 elapsed_ms % 1000U);
             if (written < 0 || (size_t)written >= remaining) {
                 continue;
@@ -703,15 +703,15 @@ void measure_data(int signalCount, SignalConfig_t *signals, int *measbuffer){
             if (rc < 0) logmode = 2;
 
             move(23, 25);
-            printw("Logging since %02d:%02d:%02d ", 
-                (elapsed_ms/3600000U), 
+            printw("Logging since %02d:%02d:%02d ",
+                (elapsed_ms/3600000U),
                 (elapsed_ms/60000U)%60,
                 (elapsed_ms/1000U)%60);
         }
     }
-}    
-   
- 
+}
+
+
 void build_logfile_header(int signalCount, const SignalConfig_t *signals, char logfileHeader[2][MAX_OUTPUTLINELENGTH]) {
 
     const char *pLabel = NULL;
@@ -719,14 +719,14 @@ void build_logfile_header(int signalCount, const SignalConfig_t *signals, char l
     char *timeLabel = "time";
     char *timeUnit = "s";
     uint8_t labelDone = 0;
-    uint8_t unitDone = 0; 
+    uint8_t unitDone = 0;
     uint writeLabelCharIdx = 0;
     uint writeUnitCharIdx = 0;
     uint readCharIdx = 0;
 
 
     for (int signalIdx = -1; signalIdx < signalCount; signalIdx++) {
-       
+
         if(-1 == signalIdx){
             pLabel = timeLabel;
             pUnit = timeUnit;
@@ -738,12 +738,12 @@ void build_logfile_header(int signalCount, const SignalConfig_t *signals, char l
             pLabel = signals[signalIdx].label;
             pUnit = signals[signalIdx].unit;
         }
-        labelDone = 0; 
+        labelDone = 0;
         unitDone = 0;
         readCharIdx = 0;
-        
+
         while(writeLabelCharIdx < MAX_OUTPUTLINELENGTH - 2 || writeUnitCharIdx < MAX_OUTPUTLINELENGTH - 2){
-            
+
             if(pLabel[readCharIdx] != '\0' && readCharIdx < MAX_LABELLENGTH &&
                labelDone != 1){
                 logfileHeader[0][writeLabelCharIdx] = pLabel[readCharIdx];
@@ -763,7 +763,7 @@ void build_logfile_header(int signalCount, const SignalConfig_t *signals, char l
                 writeUnitCharIdx++;
                 unitDone = 1;
             }
-            
+
             readCharIdx++;
 
             if(unitDone && labelDone){
@@ -804,7 +804,7 @@ int main(int argc, char *argv[]){
     int measBuffer[MAX_LABELCOUNT] = {0};
     char time_str[32];
     int connectReq = 0;
-    int visualizeReq = 0; 
+    int visualizeReq = 0;
     uint8_t connectionActive = 0;
     uint8_t visualizeActive = 0;
     int romId = 0x0;
@@ -820,7 +820,7 @@ int main(int argc, char *argv[]){
                       exit(0);
         }
     }
-    
+
     signalCount = load_signal_config(configfile, signals, MAX_LABELCOUNT);
     if (signalCount <= 0) {
         fprintf(stderr, "No valid signals loaded from config file.\n");
@@ -829,7 +829,7 @@ int main(int argc, char *argv[]){
 
 
     build_logfile_header(signalCount, signals, logfileHeader);
-    
+
     mkdir("log", 0755);  // creates log/ if it doesn't exist (UNIX)
 
     initscr();
@@ -841,7 +841,7 @@ int main(int argc, char *argv[]){
     gettimeofday(&start,NULL);
 
     while((keypress & 0xDF) != 'Q')
-    {   
+    {
         if(1 == connectionActive){
             measure_data(signalCount, signals, measBuffer);
         }
@@ -856,8 +856,8 @@ int main(int argc, char *argv[]){
             }
             screen_too_small();
     	}
-        else 
-        {   
+        else
+        {
             if(connectReq && 1 != connectionActive){
                 if ((rc=ssm_open(comport)) != 0)
                     {
@@ -881,7 +881,7 @@ int main(int argc, char *argv[]){
                 nodelay(stdscr, FALSE);
                 need_redraw=1;
             }
-            
+
             if(visualizeReq && 1 == connectionActive){
                 display_data(signalCount, signals, measBuffer);
                 if(!visualizeActive){
@@ -915,7 +915,7 @@ int main(int argc, char *argv[]){
         }
 
         if (1 == connectionActive && (logmode==1) && (logh == NULL))
-        {       
+        {
             // get current time again to start logging from 0
             gettimeofday(&start,NULL);
 
