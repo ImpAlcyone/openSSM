@@ -797,7 +797,7 @@ int main(int argc, char *argv[]){
     char *comport="/dev/ttyUSB0";
     int height,width,need_redraw=1,keypress=0;
     char logfile[256]="log/ecuscan.csv";
-    char *configfile="config/signals.conf";
+    char *configfile="../config/signals.conf";
     int signalCount = 0;
     char logfileHeader[2][MAX_OUTPUTLINELENGTH] = {'\0'};
     SignalConfig_t signals[MAX_LABELCOUNT];
