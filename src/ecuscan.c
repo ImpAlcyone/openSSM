@@ -38,7 +38,7 @@
 
 #include "ssm.h"
 
-#define MAX_LABELCOUNT 32
+#define MAX_LABELCOUNT 0x80
 #define MAX_LABELLENGTH 128
 #define MAX_UNITLENGTH 16
 #define MAX_ADDRESSLENGTH 10
@@ -550,7 +550,7 @@ void display_data(int signalCount, SignalConfig_t *signals ,int *measbuffer)
 
     move(7,49);
     white_on_black();
-    printw("Ignition Timing advance");
+    printw("ignitionTimingAdv");
 
     move(8,47);
     bar(data*100/255);
@@ -578,7 +578,7 @@ void display_data(int signalCount, SignalConfig_t *signals ,int *measbuffer)
     printw("Knock correction");
 
     move(11,47);
-    bar((data + 100) / 200);
+    bar((data+100) / 2);
 
     move(11,68);
     white_on_black();
@@ -590,7 +590,7 @@ void display_data(int signalCount, SignalConfig_t *signals ,int *measbuffer)
     /* Read final timing      */
     /*-----------------------*/
 
-    currentIdx = find_signal_index("ignitionTimingFnl", signalCount, signals);
+    currentIdx = find_signal_index("ignitionTimingAdv_alt", signalCount, signals);
     if(currentIdx == -1){
         data = 0;
     }else{
@@ -599,7 +599,7 @@ void display_data(int signalCount, SignalConfig_t *signals ,int *measbuffer)
 
     move(13,49);
     white_on_black();
-    printw("Final Ignition Timing");
+    printw("ignitionTimingAdv_alt");
 
     move(14,47);
     bar(data*100/255);
@@ -614,7 +614,7 @@ void display_data(int signalCount, SignalConfig_t *signals ,int *measbuffer)
     /* Read Lambda correction*/
     /*-----------------------*/
 
-    currentIdx = find_signal_index("AFCorrection", signalCount, signals);
+    currentIdx = find_signal_index("ignitionTimingFnl_02", signalCount, signals);
     if(currentIdx == -1){
         data = 0;
     }else{
@@ -623,14 +623,14 @@ void display_data(int signalCount, SignalConfig_t *signals ,int *measbuffer)
 
     move(16,49);
     white_on_black();
-    printw("AFR correction");
+    printw("ignitionTimingFnl_02");
 
     move(17,47);
-    bar(((data*128)/100)+128);
+    bar(data*100/256);
 
     move(17,68);
     white_on_black();
-    printw(" %3d%% ",data);
+    printw(" %3d% ",data);
 
     refresh();
 }
@@ -640,12 +640,14 @@ void measure_data(int signalCount, SignalConfig_t *signals, int *measbuffer){
     uint8_t rawData = 0;
     uint32_t elapsed_ms = 0;
 
-    for (int pollIdx = 0; pollIdx < signalCount; pollIdx++) {
+    for (int pollIdx = 0; pollIdx < signalCount; pollIdx++)
+    {
         if (!signals[pollIdx].loggingEnabled) {
             continue;
         }
 
-        if ((rc = ssm_query_ecu(signals[pollIdx].address, &rawData, 1)) != 0) {
+        if ((rc = ssm_query_ecu(signals[pollIdx].address, &rawData, 1)) != 0)
+        {
             continue; // failed read is skipped
         }
 
@@ -654,7 +656,8 @@ void measure_data(int signalCount, SignalConfig_t *signals, int *measbuffer){
                                signals[pollIdx].conversionMulFactor) /
                                signals[pollIdx].conversionDivFactor;
 
-        if (logmode == 1) {
+        // write a log line if logging is enabled and the last signal is measured
+        if ((logmode == 1) && (pollIdx == (signalCount - 1))) {
             // Get time with milliseconds precision
             gettimeofday(&now, NULL);
             elapsed_ms = (now.tv_sec - start.tv_sec) * 1000U +
@@ -712,7 +715,8 @@ void measure_data(int signalCount, SignalConfig_t *signals, int *measbuffer){
 }
 
 
-void build_logfile_header(int signalCount, const SignalConfig_t *signals, char logfileHeader[2][MAX_OUTPUTLINELENGTH]) {
+void build_logfile_header(int signalCount, const SignalConfig_t *signals, char logfileHeader[2][MAX_OUTPUTLINELENGTH])
+{
 
     const char *pLabel = NULL;
     const char *pUnit = NULL;
@@ -725,7 +729,7 @@ void build_logfile_header(int signalCount, const SignalConfig_t *signals, char l
     uint readCharIdx = 0;
 
 
-    for (int signalIdx = -1; signalIdx < signalCount; signalIdx++) {
+    for (int signalIdx = -1; signalIdx < signalCount; ++signalIdx) {
 
         if(-1 == signalIdx){
             pLabel = timeLabel;
